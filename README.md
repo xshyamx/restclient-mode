@@ -162,6 +162,18 @@ Varaibles can also be set based on the body of a response using the per-request 
 
     {"test": "foo"}
 
+For basic interoperability with the .http format popularized by Microsoft, variables can also be declared with @:
+
+    @user-id=42
+
+and referenced enclosed in curly braces:
+
+    GET http://localhost:4000/users/{{user-id}}
+
+You can freely mix and match styles in the same file.
+
+More complex variants of .http syntax, like referencing named requests, are not supported, and must instead be re-implemented as native restclient per-request hooks.
+
 # File uploads
 
 Restclient now allows to specify file path to use as a body, like this:

@@ -195,10 +195,10 @@
   "^\\([^](),/:;@[\\{}= \t]+\\): \\(.*\\)$")
 
 (defconst restclient-use-var-regexp
-  "^\\(:[^: \n]+\\)$")
+  "^:\\([^: \n]+\\)\\|{{\\([^} \n]+\\)}}$")
 
 (defconst restclient-var-regexp
-  (concat "^\\(:[^:= ]+\\)[ \t]*\\(:?\\)=[ \t]*\\(<<[ \t]*\n\\(\\(.*\n\\)*?\\)" restclient-comment-separator "\\|\\([^<].*\\)$\\)"))
+  (concat "^\\(?::\\([^:= ]+\\)\\|@\\([^:= ]+\\)\\)[ \t]*\\(:?\\)=[ \t]*\\(<<[ \t]*\n\\(\\(.*\n\\)*?\\)" restclient-comment-separator "\\|\\([^<].*\\)$\\)"))
 
 (defconst restclient-svar-regexp
   "^\\(:[^:= ]+\\)[ \t]*=[ \t]*\\(.+?\\)$")
@@ -448,11 +448,19 @@ The buffer contains the raw HTTP response sent by the server."
             (continue t))
         (while (and continue (> pass 0))
           (setq pass (- pass 1))
-          (setq current (replace-regexp-in-string (regexp-opt (mapcar 'car replacements))
-                                                  (lambda (key)
-                                                    (setq continue t)
-                                                    (cdr (assoc key replacements)))
-                                                  current t t)))
+          (setq current (replace-regexp-in-string
+                         (regexp-opt (append
+                                      (mapcar #'(lambda (r)
+                                                  (format ":%s" (car r)))
+                                              replacements)
+                                      (mapcar #'(lambda (r)
+                                                  (format "{{%s}}" (car r)))
+                                              replacements)))
+                         (lambda (key)
+                           (setq continue t)
+                           (setq key (restclient-sanitize-var-name key))
+                           (cdr (assoc key replacements)))
+                         current t t)))
         current)
     string))
 
@@ -469,9 +477,10 @@ The buffer contains the raw HTTP response sent by the server."
     (save-excursion
       (goto-char (point-min))
       (while (search-forward-regexp restclient-var-regexp bound t)
-        (let ((name (match-string-no-properties 1))
-              (should-eval (> (length (match-string 2)) 0))
-              (value (or (restclient-chop (match-string-no-properties 4)) (match-string-no-properties 3))))
+        (let ((name (or (match-string-no-properties 1)
+                        (match-string-no-properties 2)))
+              (should-eval (> (length (match-string 3)) 0))
+              (value (or (restclient-chop (match-string-no-properties 5)) (match-string-no-properties 4))))
           (setq vars (cons (cons name (if should-eval (restclient-eval-var value) value)) vars))))
       (append restclient-var-overrides vars))))
 
@@ -521,16 +530,25 @@ bound to C-c C-r."
   (let ((new-cell (cons name (cons creation-func description))))
     (setq restclient-result-handlers (cons new-cell restclient-result-handlers))))
 
+(defun restclient-sanitize-var-name (var-name)
+  (save-match-data
+    (when (string-match restclient-use-var-regexp var-name)
+      (setq var-name (or (match-string 1 var-name) (match-string 2 var-name)))))
+  var-name)
+
 (defun restclient-remove-var (var-name)
-  (setq restclient-var-overrides (assoc-delete-all var-name restclient-var-overrides)))
+  (let ((var-name (restclient-sanitize-var-name var-name)))
+    (setq restclient-var-overrides (assoc-delete-all var-name restclient-var-overrides))))
 
 (defun restclient-set-var (var-name value)
-  (restclient-remove-var var-name)
-  (setq restclient-var-overrides (cons (cons var-name value) restclient-var-overrides)))
+  (let ((var-name (restclient-sanitize-var-name var-name)))
+    (restclient-remove-var var-name)
+    (setq restclient-var-overrides (cons (cons var-name value) restclient-var-overrides))))
 
 (defun restclient-get-var-at-point (var-name buffer-name buffer-pos)
   (message (format "getting var %s form %s at %s" var-name buffer-name buffer-pos))
-  (let* ((vars-at-point  (save-excursion
+  (let* ((var-name (restclient-sanitize-var-name var-name))
+         (vars-at-point  (save-excursion
 			   (switch-to-buffer buffer-name)
 			   (goto-char buffer-pos)
 			   ;; if we're called from a restclient buffer we need to lookup vars before the current hook or evar
@@ -547,7 +565,7 @@ bound to C-c C-r."
 (defun restclient-single-request-function ()
   (dolist (f restclient-curr-request-functions)
     (ignore-errors
-      (funcall f)))  
+      (funcall f)))
   (setq restclient-curr-request-functions nil)
   (remove-hook 'restclient-response-loaded-hook 'restclient-single-request-function))
 
@@ -570,7 +588,7 @@ bound to C-c C-r."
                 ((and (looking-at restclient-header-regexp) (not (looking-at restclient-empty-line-regexp)))
                  (setq headers (cons (restclient-replace-all-in-header vars (restclient-make-header)) headers)))
                 ((looking-at restclient-use-var-regexp)
-                 (setq headers (append headers (restclient-parse-headers (restclient-replace-all-in-string vars (match-string 1)))))))
+                 (setq headers (append headers (restclient-parse-headers (restclient-replace-all-in-string vars (match-string 0)))))))
           (forward-line))
         (when (looking-at restclient-empty-line-regexp)
           (forward-line))

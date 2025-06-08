@@ -162,6 +162,15 @@
   "An alist of vars that will override any set in the file,
   also where dynamic vars set on callbacks are stored.")
 
+(defvar restclient-var-defaults nil
+  "An alist of fallback values for vars not defined elsewhere.")
+
+(defvar restclient-current-env-file nil
+  "The file containing current environment definitions.")
+
+(defvar restclient-current-env-name nil
+  "Current environment name, defined in `restclient-current-env-file'.")
+
 (defvar restclient-result-handlers '()
   "A registry of available completion hooks.
    Stored as an alist of name -> (hook-creation-func . description)")
@@ -471,6 +480,36 @@ The buffer contains the raw HTTP response sent by the server."
 (defun restclient-chop (text)
   (if text (replace-regexp-in-string "\n$" "" text) nil))
 
+(defun restclient-set-env (env-file env-name)
+  "Define variables for the current environment.
+
+ENV-FILE is a json file as defined in
+https://learn.microsoft.com/en-us/aspnet/core/test/http-files?view=aspnetcore-9.0#environment-files.
+Alternatively, a VS Code settings file with the environments defined under the key
+rest-client.environmentVariables is acceptable.
+
+ENV-NAME is the name of a specific environment defined in ENV-FILE.
+
+The special environment name `$shared' will always load in addition to the requested env,
+with lower priority."
+  (interactive "fEnvironment file name:\nsEnvironment name:")
+  (setq restclient-current-env-file env-file)
+  (setq restclient-current-env-name env-name)
+  (restclient-reload-current-env))
+
+(defun restclient-reload-current-env ()
+  "Refresh variable definitions from current environment definition."
+  (interactive)
+  (when (and restclient-current-env-file restclient-current-env-name) 
+    (let* ((json-key-type 'string)
+           (envs (json-read-file restclient-current-env-file)))
+      (when (assoc "rest-client.environmentVariables" envs)
+        (setq envs (cdr (assoc "rest-client.environmentVariables" envs))))
+      (setq restclient-var-defaults
+            (append (cdr (assoc restclient-current-env-name envs))
+                    (cdr (assoc "$shared" envs)))))
+    (message "Environment \"%s\" loaded" restclient-current-env-name)))
+
 (defun restclient-find-vars-before-point ()
   (let ((vars nil)
         (bound (point)))
@@ -482,7 +521,7 @@ The buffer contains the raw HTTP response sent by the server."
               (should-eval (> (length (match-string 3)) 0))
               (value (or (restclient-chop (match-string-no-properties 5)) (match-string-no-properties 4))))
           (setq vars (cons (cons name (if should-eval (restclient-eval-var value) value)) vars))))
-      (append restclient-var-overrides vars))))
+      (append restclient-var-overrides vars restclient-var-defaults))))
 
 (defun restclient-eval-var (string)
   (with-output-to-string (princ (eval (read string)))))
@@ -810,7 +849,9 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
     (define-key map (kbd "C-c C-.") 'restclient-mark-current)
     (define-key map (kbd "C-c C-u") 'restclient-copy-curl-command)
     (define-key map (kbd "C-c n n") 'restclient-narrow-to-current)
-    (define-key map (kbd "C-c C-i") 'restclient-show-info)   
+    (define-key map (kbd "C-c C-i") 'restclient-show-info)
+    (define-key map (kbd "C-c C-e") 'restclient-set-env)
+    (define-key map (kbd "C-c M-e") 'restclient-reload-current-env)
     map)
   "Keymap for restclient-mode.")
 

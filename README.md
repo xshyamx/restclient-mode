@@ -31,6 +31,8 @@ and supports a few additional keypresses:
 - `TAB`: hide/show current request body, only if 
 - `C-c C-a`: show all collapsed regions
 - `C-c C-i`: show information on restclient variables at point
+- `C-c C-e`: prompt for environment from which to load variable definitions
+- `C-c M-e`: reload the currently active environment
 
 The last two functions are implemented as `restclient-outline-mode` minor mode, which is activated by default via hook for major mode. Remove this hook using `(remove-hook 'restclient-mode-hook 'restclient-outline-mode)` if you don't wish to have this behaviour, or it clashes with any other binding for `TAB` like autocomplete. 
 
@@ -142,7 +144,7 @@ and the body.
 
     { "name": ":the-name" }
 
-Varaibles can also be set based on the body of a response using the per-request hooks
+Variables can also be set based on the body of a response using the per-request hooks
 
     # set a variable :my-ip to the value of your ip address using elisp evaluated in the result buffer
     GET http://httpbin.org/ip
@@ -173,6 +175,30 @@ and referenced enclosed in curly braces:
 You can freely mix and match styles in the same file.
 
 More complex variants of .http syntax, like referencing named requests, are not supported, and must instead be re-implemented as native restclient per-request hooks.
+
+# Environment files
+
+In addition to in-buffer variables, variables can be defined in
+environments, which in turn can be defined in files.  More than one
+environment may be defined per file.  An environment file and
+environment is activated by `C-c C-e`, which will prompt for filename
+and environment name.
+
+An environment file is a JSON file containing an object with
+environment names as keys.  The value of each key is another JSON
+object with variable names as keys.
+
+The special environment name "$shared" is always loaded in addition to
+the specified environment name.  Values defined in the specified
+environment name supersedes the values in she "$shared" section.
+
+After changes to the active environment file, it must be reloaded with
+`C-c M-e` before the changes will be discovered by restclient.
+
+For compatibility with other editors, which keep restclient
+environments in their settings file, if the loaded JSON file contains
+a key "rest-client.environmentVariables", the value of this key is
+taken as the environment defintion, instead of the top-level object.
 
 # File uploads
 

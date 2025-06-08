@@ -740,26 +740,32 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
   (interactive)
   (let ((vars-at-point (restclient-find-vars-before-point)))
     (cl-labels ((non-overidden-vars-at-point ()
-					     (seq-filter (lambda (v)
-							   (null (assoc (car v) restclient-var-overrides)))
-							 vars-at-point))
+		  (seq-filter (lambda (v)
+				(null (assoc (car v) restclient-var-overrides)))
+			      vars-at-point))
 		(sanitize-value-cell (var-value)
-		     (replace-regexp-in-string "\n" "|\n| |"
-			       (replace-regexp-in-string "\|" "\\\\vert{}"
-					 (restclient-replace-all-in-string vars-at-point var-value))))
+		  (replace-regexp-in-string
+                   "\n" "|\n| |"
+                   (replace-regexp-in-string
+                    "\|" "\\\\vert{}"
+                    (replace-regexp-in-string
+                     "_" "\\\\under{}"
+		     (restclient-replace-all-in-string vars-at-point var-value)))))
+                (sanitize-name-cell (var-name)
+                  (replace-regexp-in-string "_" "\\\\under{}" var-name))
 		(var-row (var-name var-value)
-			 (insert "|" var-name "|" (sanitize-value-cell var-value) "|\n"))
+		  (insert "|" (sanitize-name-cell var-name) "|" (sanitize-value-cell var-value) "|\n"))
 		(var-table (table-name)
-			   (insert (format "* %s \n|--|\n|Name|Value|\n|---|\n" table-name)))
+		  (insert (format "* %s \n|--|\n|Name|Value|\n|---|\n" table-name)))
 		(var-table-footer ()
-				  (insert "|--|\n\n")))
+		  (insert "|--|\n\n")))
       
       (with-current-buffer (get-buffer-create restclient-info-buffer-name)
 	;; insert our info
 	(erase-buffer)
 
 	(insert "\Restclient Info\ \n\n")
-       
+
 	(var-table "Dynamic Variables")
 	(dolist (dv restclient-var-overrides)
 	  (var-row (car dv) (cdr dv)))
@@ -776,7 +782,7 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
 	;; registered callbacks
 	(var-table "Registered request hook types")
 	(dolist (handler-name (delete-dups (mapcar 'car restclient-result-handlers)))
-	       (var-row handler-name (cddr (assoc handler-name restclient-result-handlers))))
+	  (var-row handler-name (cddr (assoc handler-name restclient-result-handlers))))
     	(var-table-footer)
 
 	(insert "\n\n'q' to exit\n")

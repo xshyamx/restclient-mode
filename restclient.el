@@ -893,6 +893,9 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
   (add-to-invisibility-spec '(outline . t)))
 
 (add-hook 'restclient-mode-hook 'restclient-outline-mode)
+(add-hook 'restclient-mode-hook #'(lambda ()
+                                    (setq imenu-generic-expression
+                                          `((nil ,restclient-method-url-regexp 0)))))
 
 (provide 'restclient)
 

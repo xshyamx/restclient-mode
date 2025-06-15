@@ -101,7 +101,7 @@ You declare a variable like this:
 
 or like this:
 
-    :myvar := (some (artbitrary 'elisp)
+    :myvar := (some (arbitrary 'elisp))
 
 In second form, the value of variable is evaluated as Emacs Lisp form immediately. Evaluation of variables is done from top to bottom. Only one one-line form for each variable is allowed, so use `(progn ...)` and some virtual line wrap mode if you need more. There's no way to reference earlier declared _restclient_ variables, but you can always use `setq` to save state.
 
@@ -215,7 +215,7 @@ Restclient now allows to specify file path to use as a body, like this:
 - Yet same variable cannot contain both headers and body, it must be split into two and separated by empty line as usual.
 - Variables now can reference each other, substitution happens in several passes and stops when there's no more variables. Please avoid circular references. There's customizable safeguard of maximum 10 passes to prevent hanging in this case, but it will slow things down.
 - Variable declaration only considered above request line.
-- Be careful of what you put in that elisp. No security checks are done, so it can format your hardrive. If there's a parsing or evaluation error, it will tell you in the minibuffer.
+- Be careful of what you put in that elisp. No security checks are done, so it can format your hard drive. If there's a parsing or evaluation error, it will tell you in the minibuffer.
 - Elisp variables can evaluate to values containing other variable references, this will be substituted too. But you cannot substitute parts of elisp expressions.
 
 # Customization

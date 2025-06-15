@@ -351,7 +351,7 @@
             (let ((json-special-chars (remq (assoc ?/ json-special-chars) json-special-chars))
 		  ;; Emacs 27 json.el uses `replace-buffer-contents' for
 		  ;; pretty-printing which is great because it keeps point and
-		  ;; markers intact but can be very slow with huge minimalized
+		  ;; markers intact but can be very slow with huge minimized
 		  ;; JSON.  We don't need that here.
 		  (json-pretty-print-max-secs 0))
               (ignore-errors (json-pretty-print-buffer)))
@@ -373,7 +373,7 @@
       (replace-match (char-to-string (decode-char 'ucs (string-to-number (match-string 1) 16))) t nil))))
 
 (defun restclient-http-handle-response (status method url bufname raw stay-in-window suppress-response-buffer)
-  "Switch to the buffer returned by `url-retreive'.
+  "Switch to the buffer returned by `url-retrieve'.
 The buffer contains the raw HTTP response sent by the server."
   (setq restclient-within-call nil)
   (setq restclient-request-time-end (current-time))
@@ -405,7 +405,7 @@ The buffer contains the raw HTTP response sent by the server."
                        (intern (downcase (match-string 1)))
                      'utf-8)))
     (if image?
-        ;; Dont' attempt to decode. Instead, just switch to the raw HTTP response buffer and
+        ;; Don't attempt to decode. Instead, just switch to the raw HTTP response buffer and
         ;; rename it to target-buffer-name.
         (with-current-buffer raw-http-response-buffer
           ;; We have to kill the target buffer if it exists, or `rename-buffer'

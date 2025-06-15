@@ -500,7 +500,7 @@ with lower priority."
 (defun restclient-reload-current-env ()
   "Refresh variable definitions from current environment definition."
   (interactive)
-  (when (and restclient-current-env-file restclient-current-env-name) 
+  (when (and restclient-current-env-file restclient-current-env-name)
     (let* ((json-key-type 'string)
            (envs (json-read-file restclient-current-env-file)))
       (when (assoc "rest-client.environmentVariables" envs)
@@ -735,7 +735,7 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
   (backward-char 1)
   (setq deactivate-mark nil))
 
-(defun restclient-show-info ()  
+(defun restclient-show-info ()
   ;; restclient-info-buffer-name
   (interactive)
   (let ((vars-at-point (restclient-find-vars-before-point)))
@@ -759,7 +759,7 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
 		  (insert (format "* %s \n|--|\n|Name|Value|\n|---|\n" table-name)))
 		(var-table-footer ()
 		  (insert "|--|\n\n")))
-      
+
       (with-current-buffer (get-buffer-create restclient-info-buffer-name)
 	;; insert our info
 	(erase-buffer)
@@ -810,7 +810,7 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
         (end-of-line)
         ;; If the overlays at this point have 'invisible set, toggling
         ;; must make the region visible. Else it must hide the region
-        
+
         ;; This part of code is from org-hide-block-toggle method of
         ;; Org mode
         (let ((overlays (overlays-at (point))))

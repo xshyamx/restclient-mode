@@ -157,7 +157,7 @@ POST http://httpbin.org/post?q=2
 PUT http://httpbin.org/put
 Content-type: text/plain
 
-< /etc/passwd
+< /etc/nsswitch.conf
 # Test for issue #121
 POST http://httpbin.org/post
 

@@ -200,6 +200,9 @@
 (defconst restclient-method-url-regexp
   "^[[:blank:]]*\\(GET\\|POST\\|DELETE\\|PUT\\|HEAD\\|OPTIONS\\|PATCH\\|PROPFIND\\) \\(.*\\)$")
 
+(defconst restclient-method-body-prohibited-regexp
+  "^GET\\|HEAD$")
+
 (defconst restclient-header-regexp
   "^\\([^](),/:;@[\\{}= \t]+\\): \\(.*\\)$")
 
@@ -254,7 +257,9 @@
       (message "HTTP %s %s Headers:[%s] Body:[%s]" method url headers entity))
   (let ((url-request-method (encode-coding-string method 'us-ascii))
         (url-request-extra-headers '())
-        (url-request-data (encode-coding-string entity 'utf-8))
+        (url-request-data (if (string-match restclient-method-body-prohibited-regexp method)
+                              nil
+                            (encode-coding-string entity 'utf-8)))
         (url-mime-charset-string (url-mime-charset-string))
         (url-mime-language-string nil)
         (url-mime-encoding-string nil)

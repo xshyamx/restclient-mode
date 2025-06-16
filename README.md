@@ -207,7 +207,26 @@ Restclient now allows to specify file path to use as a body, like this:
     POST http://httpbin.org/post
     Content-type: text/plain
 
-    < /etc/passwd
+    < /etc/nsswitch.conf
+
+The file name can be contained in a variable, like this:
+
+    :myfile = /etc/nsswitch.conf
+    POST http://httpbin.org/post
+    Content-type: text/plain
+
+    < :myfile
+
+And the request body may also contain surrounding context:
+
+    :myfile = /etc/nsswitch.conf
+    POST http://httpbin.org/post
+    Content-type: text/plain
+
+    This is the contents of /etc/nsswitch.conf
+    < :myfile
+    Are you switched on yet?
+
 
 ### Caveats:
 

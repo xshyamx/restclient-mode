@@ -158,6 +158,32 @@ PUT http://httpbin.org/put
 Content-type: text/plain
 
 < /etc/nsswitch.conf
+
+# File upload with surrounding context
+PUT http://httpbin.org/put
+Content-type: text/plain
+
+Some content here
+< /etc/nsswitch.conf
+And some after
+
+# File upload with variable file name
+:filename = /etc/nsswitch.conf
+
+PUT http://httpbin.org/put
+Content-type: text/plain
+
+<:filename
+
+# File upload with variable file name and surrounding context
+:filename = /etc/nsswitch.conf
+
+PUT http://httpbin.org/put
+Content-type: text/plain
+
+This is the file contents:
+<:filename
+
 # Test for issue #121
 POST http://httpbin.org/post
 

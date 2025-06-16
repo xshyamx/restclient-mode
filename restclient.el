@@ -682,7 +682,7 @@ bound to C-c C-r."
  "Call the provided (possibly multi-line) elisp when the result
   buffer is formatted. Equivalent to a restclient-response-loaded-hook
   that only runs for this request.
-  eg. -> on-response (message \"my hook called\")" )
+  eg. -> run-hook (message \"my hook called\")" )
 
 ;;;###autoload
 (defun restclient-http-send-current (&optional raw stay-in-window suppress-response-buffer)

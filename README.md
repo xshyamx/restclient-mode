@@ -284,6 +284,26 @@ Size of the response buffer restclient can display without huge performance drop
 If response buffer will be more than that, only bare major mode will be used to display it.
 Set to `nil` to disable threshold completely.
 
+### restclient-content-type-modes
+
+__Default: '(("text/xml" . xml-mode)
+             ("text/plain" . text-mode)
+             ("application/xml" . xml-mode)
+             ("application/json" . js-mode)
+             ("image/png" . image-mode)
+             ("image/jpeg" . image-mode)
+             ("image/jpg" . image-mode)
+             ("image/gif" . image-mode)
+             ("text/html" . html-mode))__
+
+An association list mapping content types to buffer modes
+
+### restclient-response-body-only
+
+__Default: nil__
+
+When non-nil, don't include the request details in the response buffer.
+
 # Known issues
 
 - Comment lines `#` act as end of entity. Yes, that means you can't post shell script or anything with hashes as PUT/POST entity. I'm fine with this right now,

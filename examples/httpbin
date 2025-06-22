@@ -155,11 +155,12 @@ POST http://httpbin.org/post?q=2
     "common": :common-body
 }
 
-### POST
+### POST replacing variables in file
 POST /post?q=3
 Content-Type: application/json
 
 <: with-vars.json
+
 
 # File upload
 PUT http://httpbin.org/put
@@ -229,3 +230,13 @@ POST /response-headers?X-Custom-Id=one
 
 ### GET /json
 GET /json
+-> run-hook (with-current-buffer restclient-response-buffer-name
+	(when-let (obj (json-read-object))
+		(restclient-set-var ":json" (json-encode obj))))
+
+:base-uri = http://localhost:8080
+### POST
+POST /post
+Content-Type: application/json
+
+:json

@@ -101,6 +101,18 @@ HTTPS and image display requires additional dll's on windows (libtls, libpng, li
 
 More examples can be found in the `examples` directory.
 
+Requests can use relative path provided that the `:base-uri` variable is defined in the buffer.
+
+```
+:base-uri = http://httbin.org
+# get json
+GET /json
+```
+
+In the above example the request will be sent to `http://httbin.org/json`.
+
+**NOTE**: There can be multiple assignments to `:base-uri` but, the first one in the buffer seems to take precedence.
+
 # In-buffer variables
 
 You declare a variable like this:

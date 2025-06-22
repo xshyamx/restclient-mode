@@ -36,12 +36,12 @@
   :group 'restclient
   :type 'boolean)
 
-(defcustom restclient-same-buffer-response t
+(defcustom restclient-resuse-response-buffer t
   "Re-use same buffer for responses or create a new one each time."
   :group 'restclient
   :type 'boolean)
 
-(defcustom restclient-same-buffer-response-name "*HTTP Response*"
+(defcustom restclient-response-buffer-name "*HTTP Response*"
   "Name for response buffer."
   :group 'restclient
   :type 'string)
@@ -218,6 +218,10 @@
 (defconst restclient-response-hook-regexp
   "^\\(->\\) \\([^[:space:]]+\\) +\\(.*\\)$")
 
+(defconst restclient-base-uri-var
+	":base-uri"
+	"Name of the base uri variable to in relative urls")
+
 ;; The following disables the interactive request for user name and
 ;; password should an API call encounter a permission-denied response.
 ;; This API is meant to be usable without constant asking for username
@@ -264,15 +268,19 @@
             (set (cdr mapped) (encode-coding-string (cdr header) 'us-ascii))
           (let* ((hkey (encode-coding-string (car header) 'us-ascii))
                  (hvalue (encode-coding-string (cdr header) 'us-ascii)))
-            (setq url-request-extra-headers (cons (cons hkey hvalue) url-request-extra-headers))))))
+            (setq url-request-extra-headers
+									(cons (cons hkey hvalue) url-request-extra-headers))))))
 
     (setq restclient-within-call t)
     (setq restclient-request-time-start (current-time))
     (run-hooks 'restclient-http-do-hook)
     (url-retrieve url 'restclient-http-handle-response
-                  (append (list method url (if restclient-same-buffer-response
-                                               restclient-same-buffer-response-name
-                                             (format "*HTTP %s %s*" method url))) handle-args) nil restclient-inhibit-cookies)))
+                  (append (list method url
+																(if restclient-resuse-response-buffer
+                                    restclient-response-buffer-name
+                                  (format "*HTTP %s %s*" method url)))
+													handle-args)
+									nil restclient-inhibit-cookies)))
 
 (defun restclient-prettify-response (method url)
   (save-excursion
@@ -287,7 +295,8 @@
                                                     (match-string-no-properties 2))
                                                    restclient-content-type-modes
                                                    t))))
-                        (forward-line)) 0)))
+                        (forward-line))
+											0)))
       (setq end-of-headers (point))
       (while (and (looking-at restclient-empty-line-regexp)
                   (eq (forward-line) 0)))
@@ -298,7 +307,8 @@
                                  '(("<\\?xml " . xml-mode)
                                    ("{\\s-*\"" . js-mode))
                                  (lambda (re _dummy)
-                                   (looking-at re))) 'js-mode)))
+                                   (looking-at re)))
+									'js-mode)))
       (let ((headers (buffer-substring-no-properties start end-of-headers)))
         (when guessed-mode
           (delete-region start (point))
@@ -340,22 +350,22 @@
 
            ((eq guessed-mode 'js-mode)
             (let ((json-special-chars (remq (assoc ?/ json-special-chars) json-special-chars))
-		  ;; Emacs 27 json.el uses `replace-buffer-contents' for
-		  ;; pretty-printing which is great because it keeps point and
-		  ;; markers intact but can be very slow with huge minimalized
-		  ;; JSON.  We don't need that here.
-		  (json-pretty-print-max-secs 0))
+									;; Emacs 27 json.el uses `replace-buffer-contents' for
+									;; pretty-printing which is great because it keeps point and
+									;; markers intact but can be very slow with huge minimalized
+									;; JSON.  We don't need that here.
+									(json-pretty-print-max-secs 0))
               (ignore-errors (json-pretty-print-buffer)))
             (restclient-prettify-json-unicode)))
 
           (goto-char (point-max))
           (or (eq (point) (point-min)) (insert "\n"))
-	  (unless restclient-response-body-only
+					(unless restclient-response-body-only
             (let ((hstart (point)))
               (insert method " " url "\n" headers)
               (insert (format "Request duration: %fs\n" (float-time (time-subtract restclient-request-time-end restclient-request-time-start))))
               (unless (member guessed-mode '(image-mode text-mode))
-		(comment-region hstart (point))))))))))
+								(comment-region hstart (point))))))))))
 
 (defun restclient-prettify-json-unicode ()
   (save-excursion
@@ -374,12 +384,12 @@ The buffer contains the raw HTTP response sent by the server."
       (with-current-buffer (restclient-decode-response
                             (current-buffer)
                             bufname
-                            restclient-same-buffer-response)
+                            restclient-response-buffer-name)
         (run-hooks 'restclient-response-received-hook)
         (unless raw
           (restclient-prettify-response method url))
         (buffer-enable-undo)
-	(restclient-response-mode)
+				(restclient-response-mode)
         (run-hooks 'restclient-response-loaded-hook)
         (unless suppress-response-buffer
           (if stay-in-window
@@ -568,15 +578,15 @@ bound to C-c C-r."
 										(string-prefix-p "https://" url))
 					(if-let (base-uri (and (string-prefix-p "/" url)
 																 (restclient-get-var-at-point
-																	":base-uri"
+																	restclient-base-uri-var
 																	(buffer-name (current-buffer))
 																	(point))))
 							(setq url (concat (restclient-get-var-at-point
-																 ":base-uri"
+																 restclient-base-uri-var
 																 (buffer-name (current-buffer))
 																 (point))
 																url))
-						(user-error "url MUST start with `/' and `:base-uri' must be defined")))
+						(user-error "url MUST start with `/' and `" restclient-base-uri-var "' must be defined")))
         (forward-line)
         (while (cond
 								((looking-at restclient-response-hook-regexp)
@@ -763,26 +773,29 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
   ;; restclient-info-buffer-name
   (interactive)
   (let ((vars-at-point (restclient-find-vars-before-point)))
-    (cl-labels ((non-overidden-vars-at-point ()
-									(seq-filter (lambda (v)
-																(null (assoc (car v) restclient-var-overrides)))
-															vars-at-point))
-								(sanitize-value-cell (var-value)
-									(replace-regexp-in-string "\n" "|\n| |"
-																						(replace-regexp-in-string "\|" "\\\\vert{}"
-																																			(restclient-replace-all-in-string vars-at-point var-value))))
-								(var-row (var-name var-value)
-									(insert "|" var-name "|" (sanitize-value-cell var-value) "|\n"))
-								(var-table (table-name)
-									(insert (format "* %s \n|--|\n|Name|Value|\n|---|\n" table-name)))
-								(var-table-footer ()
-									(insert "|--|\n\n")))
+    (cl-labels
+				((non-overidden-vars-at-point ()
+					 (seq-filter (lambda (v)
+												 (null (assoc (car v) restclient-var-overrides)))
+											 vars-at-point))
+				 (sanitize-value-cell (var-value)
+					 (replace-regexp-in-string
+						"\n" "|\n| |"
+						(replace-regexp-in-string
+						 "\|" "\\\\vert{}"
+						 (restclient-replace-all-in-string vars-at-point var-value))))
+				 (var-row (var-name var-value)
+					 (insert "|" var-name "|" (sanitize-value-cell var-value) "|\n"))
+				 (var-table (table-name)
+					 (insert (format "** %s \n|--|\n|Name|Value|\n|---|\n" table-name)))
+				 (var-table-footer ()
+					 (insert "|--|\n\n")))
 
       (with-current-buffer (get-buffer-create restclient-info-buffer-name)
 				;; insert our info
 				(erase-buffer)
 
-				(insert "\Restclient Info\ \n\n")
+				(insert "* Restclient Info\n\n")
 
 				(var-table "Dynamic Variables")
 				(dolist (dv restclient-var-overrides)

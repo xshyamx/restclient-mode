@@ -20,7 +20,7 @@ and supports a few additional keypresses:
 
 - `C-c C-c`: runs the query under the cursor, tries to pretty-print the response (if possible)
 - `C-c C-r`: same, but doesn't do anything with the response, just shows the buffer
-- `C-c C-v`: same as `C-c C-c`, but doesn't switch focus to other window
+- `C-c C-v`: same as `C-c C-c`, but switches focus to other window
 - `C-c C-b`: same as `C-c C-c`, but doesn't show response buffer
 - `C-c C-p`: jump to the previous query
 - `C-c C-n`: jump to the next query
@@ -28,11 +28,11 @@ and supports a few additional keypresses:
 - `C-c C-u`: copy query under the cursor as a curl command
 - `C-c C-g`: start a [helm](https://emacs-helm.github.io/helm/) session with sources for variables and requests (if helm is available, of course)
 - `C-c n n`: narrow to region of current request (including headers)
-- `TAB`: hide/show current request body, only if 
+- `TAB`: hide/show current request body, only if
 - `C-c C-a`: show all collapsed regions
 - `C-c C-i`: show information on restclient variables at point
 
-The last two functions are implemented as `restclient-outline-mode` minor mode, which is activated by default via hook for major mode. Remove this hook using `(remove-hook 'restclient-mode-hook 'restclient-outline-mode)` if you don't wish to have this behaviour, or it clashes with any other binding for `TAB` like autocomplete. 
+The last two functions are implemented as `restclient-outline-mode` minor mode, which is activated by default via hook for major mode. Remove this hook using `(remove-hook 'restclient-mode-hook 'restclient-outline-mode)` if you don't wish to have this behaviour, or it clashes with any other binding for `TAB` like autocomplete.
 
 Query file example:
 
@@ -131,7 +131,7 @@ and the body.
     Content-Type: application/json
     User-Agent: SomeApp/1.0
     #
-    
+
     # Update a user's name
 
     :user-id = 7
@@ -147,15 +147,15 @@ Varaibles can also be set based on the body of a response using the per-request 
     # set a variable :my-ip to the value of your ip address using elisp evaluated in the result buffer
     GET http://httpbin.org/ip
     -> run-hook (restclient-set-var ":my-ip" (cdr (assq 'origin (json-read))))
-    
+
     # same thing with jq if it's installed
-    GET http://httpbin.org/ip 
+    GET http://httpbin.org/ip
     -> jq-set-var :my-ip .origin
-    
+
     # set a variable :my-var using a more complex jq expression (requires jq-mode)
     GET https://httpbin.org/json
     -> jq-set-var :my-var .slideshow.slides[0].title
-    
+
     # hooks come before the body on POST
     POST http://httpbin.org/post
     -> jq-set-var :test .json.test
@@ -170,7 +170,7 @@ Restclient now allows to specify file path to use as a body, like this:
     Content-type: text/plain
 
     < /etc/passwd
-    
+
 ### Caveats:
 
 - Multiline variables can be used in headers or body. In URL too, but it doesn't make sense unless it was long elisp expression evaluating to simple value.

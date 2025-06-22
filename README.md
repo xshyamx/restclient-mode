@@ -104,12 +104,12 @@ More examples can be found in the `examples` directory.
 Requests can use relative path provided that the `:base-uri` variable is defined in the buffer.
 
 ```
-:base-uri = http://httbin.org
+:base-uri = http://httpbin.org
 # get json
 GET /json
 ```
 
-In the above example the request will be sent to `http://httbin.org/json`.
+In the above example the request will be sent to `http://httbin.org/json`. Any request using the relative uri will use the same `:base-uri` to override use the full url.
 
 **NOTE**: There can be multiple assignments to `:base-uri` but, the first one in the buffer seems to take precedence.
 

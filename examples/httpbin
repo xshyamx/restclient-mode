@@ -158,7 +158,11 @@ POST http://httpbin.org/post?q=2
 ### POST replacing variables in file
 POST /post?q=3
 Content-Type: application/json
-
+-> pre-request (make-restclient-request
+		:method (restclient-request-method request)
+		:url (restclient-request-url request)
+		:headers (cons '("X-Additional-Header" . "yes") (restclient-request-headers request))
+		:entity (restclient-request-entity request))
 <: with-vars.json
 
 
@@ -229,12 +233,12 @@ GET http://www.redmine.org/issues.xml?limit=10
 POST /response-headers?X-Custom-Id=one
 
 ### GET /json
+:base-uri = http://localhost:8080
 GET /json
 -> run-hook (with-current-buffer restclient-response-buffer-name
 	(when-let (obj (json-read-object))
 		(restclient-set-var ":json" (json-encode obj))))
 
-:base-uri = http://localhost:8080
 ### POST
 POST /post
 Content-Type: application/json

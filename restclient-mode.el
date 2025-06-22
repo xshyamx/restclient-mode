@@ -169,6 +169,9 @@
 (defvar restclient-curr-request-functions nil
   "A list of functions to run once when the next request is loaded")
 
+(defvar restclient-pre-request-functions nil
+  "A list of functions to run before the request is made")
+
 (defvar restclient-response-loaded-hook nil
   "Hook run after response buffer is formatted.")
 
@@ -192,7 +195,7 @@
   "^\\(GET\\|POST\\|DELETE\\|PUT\\|HEAD\\|OPTIONS\\|PATCH\\) \\(.*\\)$")
 
 (defconst restclient-header-regexp
-  "^\\([^](),/:;@[\\{}= \t]+\\): \\(.*\\)$")
+  "^\\([^](),/:;@[\\{}= \t<]+\\): \\(.*\\)$")
 
 (defconst restclient-use-var-regexp
   "^\\(:[^: \n]+\\)$")
@@ -242,6 +245,9 @@
       (setq ad-return-value nil)
     ad-do-it))
 (ad-activate 'url-http-user-agent-string)
+
+(cl-defstruct restclient-request
+	method url headers entity)
 
 (defun restclient-http-do (method url headers entity &rest handle-args)
   "Send ENTITY and HEADERS to URL as a METHOD request."
@@ -526,8 +532,8 @@ bound to C-c C-r."
 (defun restclient-parse-hook (cb-type args-offset args)
   (if-let ((handler (assoc cb-type restclient-result-handlers)))
       (funcall (cadr handler) args args-offset)
-    `(lambda ()
-       (message "Unknown restclient hook type %s" ,cb-type))))
+		`(lambda ()
+			 (message "Unknown restclient hook type %s" ,cb-type))))
 
 (defun restclient-register-result-func (name creation-func description)
   (let ((new-cell (cons name (cons creation-func description))))
@@ -573,7 +579,8 @@ bound to C-c C-r."
       (let ((method (match-string-no-properties 1))
             (url (string-trim (match-string-no-properties 2)))
             (vars (restclient-find-vars-before-point))
-            (headers '()))
+            (headers '())
+						(restclient-pre-request-functions nil))
 				(unless (or (string-prefix-p "http://" url)
 										(string-prefix-p "https://" url))
 					(if-let (base-uri (and (string-prefix-p "/" url)
@@ -593,7 +600,9 @@ bound to C-c C-r."
 								 (when-let (hook-function (restclient-parse-hook (match-string-no-properties 2)
 																																 (match-end 2)
 																																 (match-string-no-properties 3)))
-									 (push hook-function restclient-curr-request-functions)))
+									 (if (string= "pre-request" (match-string-no-properties 2))
+											 (push hook-function restclient-pre-request-functions)
+										 (push hook-function restclient-curr-request-functions))))
                 ((and (looking-at restclient-header-regexp) (not (looking-at restclient-empty-line-regexp)))
                  (setq headers (cons (restclient-replace-all-in-header vars (restclient-make-header)) headers)))
                 ((looking-at restclient-use-var-regexp)
@@ -606,7 +615,21 @@ bound to C-c C-r."
         (let* ((cmax (restclient-current-max))
                (entity (restclient-parse-body (buffer-substring (min (point) cmax) cmax) vars))
                (url (restclient-replace-all-in-string vars url)))
-          (apply func method url headers entity args))))))
+					(let ((request (make-restclient-request
+													:method method
+													:url url
+													:headers headers
+													:entity entity)))
+						(dolist (pr restclient-pre-request-functions)
+							(ignore-errors
+								(setq request
+											(funcall pr request))))
+						(apply func
+									 (restclient-request-method request)
+									 (restclient-request-url request)
+									 (restclient-request-headers request)
+									 (restclient-request-entity request)
+									 args)))))))
 
 (defun restclient-copy-curl-command ()
   "Formats the request as a curl command and copies the command to the clipboard."
@@ -706,6 +729,18 @@ bound to C-c C-r."
   buffer is formatted. Equivalent to a restclient-response-loaded-hook
   that only runs for this request.
   eg. -> on-response (message \"my hook called\")" )
+
+(restclient-register-result-func
+ "pre-request" #'restclient-elisp-request-function
+ "Call the provided (possibly multi-line) elisp before the request is sent")
+
+(defun restclient-elisp-request-function (args offset)
+	(message "restclient-elisp-request-function: %s %s" args offset)
+	(goto-char offset)
+	`(lambda (request)
+		 (if (restclient-request-p request)
+				 ,(read (current-buffer))
+			 request)))
 
 ;;;###autoload
 (defun restclient-http-send-current (&optional raw stay-in-window suppress-response-buffer)

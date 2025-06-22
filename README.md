@@ -1,4 +1,7 @@
-# restclient.el
+# restclient-mode
+
+>[!NOTE]
+> The original http://github.com/pashky/restclient.el was archived on Apri 17, 2024. This is my personal fork with just the changes that I need for my workflow
 
 This is a tool to manually explore and test HTTP REST webservices.
 Runs queries from a plain-text query sheet,
@@ -8,29 +11,35 @@ displays results as a pretty-printed XML, JSON and even images.
 
 # Usage
 
-You can easily install `restclient` using `package.el` from [MELPA](http://melpa.org/).
+You can easily install `restclient-mode` using `use-package`. Clone
+the repository into your `site-lisp` directory and add the following
+snippet
 
-Alternatively, deploy `restclient.el` into your site-lisp as usual,
-then add `(require 'restclient)` to your Emacs start-up file.
+```
+(use-package restclient-mode
+  	:load-path "site-lisp/restclient-mode")
+```
 
 Once installed, you can prepare a text file with queries.
 
 `restclient-mode` is a major mode which does a bit of highlighting
 and supports a few additional keypresses:
 
-- `C-c C-c`: runs the query under the cursor, tries to pretty-print the response (if possible)
-- `C-c C-r`: same, but doesn't do anything with the response, just shows the buffer
-- `C-c C-v`: same as `C-c C-c`, but switches focus to other window
-- `C-c C-b`: same as `C-c C-c`, but doesn't show response buffer
-- `C-c C-p`: jump to the previous query
-- `C-c C-n`: jump to the next query
-- `C-c C-.`: mark the query under the cursor
-- `C-c C-u`: copy query under the cursor as a curl command
-- `C-c C-g`: start a [helm](https://emacs-helm.github.io/helm/) session with sources for variables and requests (if helm is available, of course)
-- `C-c n n`: narrow to region of current request (including headers)
-- `TAB`: hide/show current request body, only if
-- `C-c C-a`: show all collapsed regions
-- `C-c C-i`: show information on restclient variables at point
+| Keybinding | Description |
+|----|----|
+| `C-c C-c` | runs the query under the cursor, tries to pretty-print the response (if possible) |
+| `C-c C-r` | same, but doesn't do anything with the response, just shows the buffer |
+| `C-c C-v` | same as `C-c C-c`, but switches focus to other window |
+| `C-c C-b` | same as `C-c C-c`, but doesn't show response buffer |
+| `C-c C-p` | jump to the previous query |
+| `C-c C-n` | jump to the next query |
+| `C-c C-.` | mark the query under the cursor |
+| `C-c C-u` | copy query under the cursor as a curl command |
+| `C-c C-g` | start a [helm](https://emacs-helm.github.io/helm/) session with sources for variables and requests (if helm is available, of course) |
+| `C-c n n` | narrow to region of current request (including headers) |
+| `TAB`: hi |e/show current request body, only if |
+| `C-c C-a` | show all collapsed regions |
+| `C-c C-i` | show information on restclient variables at point |
 
 The last two functions are implemented as `restclient-outline-mode` minor mode, which is activated by default via hook for major mode. Remove this hook using `(remove-hook 'restclient-mode-hook 'restclient-outline-mode)` if you don't wish to have this behaviour, or it clashes with any other binding for `TAB` like autocomplete.
 

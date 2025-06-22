@@ -683,52 +683,52 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
   (interactive)
   (let ((vars-at-point (restclient-find-vars-before-point)))
     (cl-labels ((non-overidden-vars-at-point ()
-					     (seq-filter (lambda (v)
-							   (null (assoc (car v) restclient-var-overrides)))
-							 vars-at-point))
-		(sanitize-value-cell (var-value)
-		     (replace-regexp-in-string "\n" "|\n| |"
-			       (replace-regexp-in-string "\|" "\\\\vert{}"
-					 (restclient-replace-all-in-string vars-at-point var-value))))
-		(var-row (var-name var-value)
-			 (insert "|" var-name "|" (sanitize-value-cell var-value) "|\n"))
-		(var-table (table-name)
-			   (insert (format "* %s \n|--|\n|Name|Value|\n|---|\n" table-name)))
-		(var-table-footer ()
-				  (insert "|--|\n\n")))
+									(seq-filter (lambda (v)
+																(null (assoc (car v) restclient-var-overrides)))
+															vars-at-point))
+								(sanitize-value-cell (var-value)
+									(replace-regexp-in-string "\n" "|\n| |"
+																						(replace-regexp-in-string "\|" "\\\\vert{}"
+																																			(restclient-replace-all-in-string vars-at-point var-value))))
+								(var-row (var-name var-value)
+									(insert "|" var-name "|" (sanitize-value-cell var-value) "|\n"))
+								(var-table (table-name)
+									(insert (format "* %s \n|--|\n|Name|Value|\n|---|\n" table-name)))
+								(var-table-footer ()
+									(insert "|--|\n\n")))
 
       (with-current-buffer (get-buffer-create restclient-info-buffer-name)
-	;; insert our info
-	(erase-buffer)
+				;; insert our info
+				(erase-buffer)
 
-	(insert "\Restclient Info\ \n\n")
+				(insert "\Restclient Info\ \n\n")
 
-	(var-table "Dynamic Variables")
-	(dolist (dv restclient-var-overrides)
-	  (var-row (car dv) (cdr dv)))
-	(var-table-footer)
+				(var-table "Dynamic Variables")
+				(dolist (dv restclient-var-overrides)
+					(var-row (car dv) (cdr dv)))
+				(var-table-footer)
 
-	;;    (insert ":Info:\n Dynamic vars defined by request hooks or with calls to restclient-set-var\n:END:")
+				;;    (insert ":Info:\n Dynamic vars defined by request hooks or with calls to restclient-set-var\n:END:")
 
-	(var-table "Vars at current position")
-	(dolist (dv (non-overidden-vars-at-point))
-	  (var-row (car dv) (cdr dv)))
-	(var-table-footer)
+				(var-table "Vars at current position")
+				(dolist (dv (non-overidden-vars-at-point))
+					(var-row (car dv) (cdr dv)))
+				(var-table-footer)
 
 
-	;; registered callbacks
-	(var-table "Registered request hook types")
-	(dolist (handler-name (delete-dups (mapcar 'car restclient-result-handlers)))
-	       (var-row handler-name (cddr (assoc handler-name restclient-result-handlers))))
-    	(var-table-footer)
+				;; registered callbacks
+				(var-table "Registered request hook types")
+				(dolist (handler-name (delete-dups (mapcar 'car restclient-result-handlers)))
+					(var-row handler-name (cddr (assoc handler-name restclient-result-handlers))))
+    		(var-table-footer)
 
-	(insert "\n\n'q' to exit\n")
-	(org-mode)
-	(org-toggle-pretty-entities)
-	(org-table-iterate-buffer-tables)
-	(outline-show-all)
-	(restclient-response-mode)
-	(goto-char (point-min))))
+				(insert "\n\n'q' to exit\n")
+				(org-mode)
+				(org-toggle-pretty-entities)
+				(org-table-iterate-buffer-tables)
+				(outline-show-all)
+				(restclient-response-mode)
+				(goto-char (point-min))))
     (switch-to-buffer-other-window restclient-info-buffer-name)))
 
 (defun restclient-narrow-to-current ()
@@ -783,9 +783,9 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
 
 (defvar restclient-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-c") 'restclient-http-send-current)
+    (define-key map (kbd "C-c C-c") 'restclient-http-send-current-stay-in-window)
     (define-key map (kbd "C-c C-r") 'restclient-http-send-current-raw)
-    (define-key map (kbd "C-c C-v") 'restclient-http-send-current-stay-in-window)
+    (define-key map (kbd "C-c C-v") 'restclient-http-send-current)
     (define-key map (kbd "C-c C-b") 'restclient-http-send-current-suppress-response-buffer)
     (define-key map (kbd "C-c C-n") 'restclient-jump-next)
     (define-key map (kbd "C-c C-p") 'restclient-jump-prev)
@@ -816,16 +816,18 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
 ;;;###autoload
 (define-derived-mode restclient-mode fundamental-mode "REST Client"
   "Turn on restclient mode."
-  (set (make-local-variable 'comment-start) "# ")
-  (set (make-local-variable 'comment-start-skip) "# *")
-  (set (make-local-variable 'comment-column) 48)
-
-  (set (make-local-variable 'font-lock-defaults) '(restclient-mode-keywords))
-  ;; We use outline-mode's method outline-flag-region to hide/show the
-  ;; body. As a part of it, it sets 'invisibility text property to
-  ;; 'outline. To get ellipsis, we need 'outline to be in
-  ;; buffer-invisibility-spec
-  (add-to-invisibility-spec '(outline . t)))
+  (setq-local comment-start "# ")
+	(setq-local comment-start-skip "# *")
+	(setq-local comment-column 48)
+	(setq-local imenu-generic-expression
+							(list
+							 (list nil restclient-method-url-regexp 2)))
+	(setq-local font-lock-defaults '(restclient-mode-keywords))
+	;; We use outline-mode's method outline-flag-region to hide/show the
+	;; body. As a part of it, it sets 'invisibility text property to
+	;; 'outline. To get ellipsis, we need 'outline to be in
+	;; buffer-invisibility-spec
+	(add-to-invisibility-spec '(outline . t)))
 
 (add-hook 'restclient-mode-hook 'restclient-outline-mode)
 

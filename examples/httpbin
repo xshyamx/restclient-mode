@@ -2,6 +2,8 @@
 # Emacs restclient examples for httpbin.org
 # http://httpbin.org/: HTTP Request & Response Service
 
+:base-uri = http://httpbin.org
+
 # Returns Origin IP.
 GET http://httpbin.org/ip
 
@@ -33,9 +35,9 @@ Content-Type: application/json
 
 # Content type is loosely matched, could be application/vnd.whatever+json
 GET http://httpbin.org/response-headers?Content-Type=application/vnd.whatever%2Bjson;%20charset=UTF-8
--> on-response (message "dynamic hook called %s %s"
+-> run-hook (message "dynamic hook called %s %s"
 (random ) (random ))
--> on-response (message "another hook")
+-> run-hook (message "another hook")
 
 
 # Content type is loosely matched, could be application/vnd.whatever+json
@@ -140,7 +142,7 @@ Content-type: application/json
 #
 # Now, use them both in request
 #
-POST http://httpbin.org/post?q=1
+POST /post?q=1
 :common-headers
 
 :common-body
@@ -153,11 +155,17 @@ POST http://httpbin.org/post?q=2
     "common": :common-body
 }
 
+### POST
+POST /post?q=3
+Content-Type: application/json
+
+<: with-vars.json
+
 # File upload
 PUT http://httpbin.org/put
 Content-type: text/plain
 
-< /etc/passwd
+< httpbin
 # Test for issue #121
 POST http://httpbin.org/post
 
@@ -182,7 +190,7 @@ Cookie: :cookie
 # dynamic per-request hooks
 
 # multi-line elisp expression called on completion
-GET http://httpbin.org/response-headers?Content-Type=application/vnd.whatever%2Bjson;%20charset=UTF-8
+GET /response-headers?Content-Type=application/vnd.whatever%2Bjson;%20charset=UTF-8
 -> run-hook (message "dynamic hook called %s %s"
                   (random ) (random ))
 
@@ -191,7 +199,7 @@ GET http://httpbin.org/ip
 -> jq-set-var :my-ip .origin
 
 # multiple elsip hooks on call
-GET http://httpbin.org/response-headers?Content-Type=application/vnd.whatever%2Bjson;%20charset=UTF-8
+GET /response-headers?Content-Type=application/vnd.whatever%2Bjson;%20charset=UTF-8
 -> run-hook (message "hook 1")
 -> run-hook (message "hook 2")
 
@@ -200,15 +208,24 @@ GET http://httpbin.org/response-headers?Content-Type=application/vnd.whatever%2B
 :password = secret
 :test-me := (format "%s:%s" ":user" ":password")
 :auth-token :=  (format "Basic %s" (base64-encode-string (restclient-get-var ":test-me")))
-
-GET http://httpbin.org/basic-auth/jack/secret
+GET /basic-auth/jack/secret
 Authorization: :auth-token
 -> run-hook (message (format "authenticated with '%s'" (restclient-get-var ":auth-token")))
 
 # saving header like csrf token for future usage
-GET http://some.api/csrf_token
+:token := (random)
+POST /response-headers?X-CSRF-Token=:token
 -> run-hook (restclient-set-var-from-header ":csrftoken" "X-CSRF-Token")
 
 # use save header
-POST http://some.api/restricted
+GET /headers
 X-CSRF-Token: :csrftoken
+
+#
+GET http://www.redmine.org/issues.xml?limit=10
+
+### GET
+POST /response-headers?X-Custom-Id=one
+
+### GET /json
+GET /json

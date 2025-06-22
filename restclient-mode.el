@@ -210,7 +210,7 @@
   "^\\(:[^: ]+\\)[ \t]*:?=[ \t]*\\(<<\\)[ \t]*$")
 
 (defconst restclient-file-regexp
-  "^<[ \t]*\\([^<>\n\r]+\\)[ \t]*$")
+  "^<\\(:?\\)[ \t]*\\([^<>\n\r]+\\)[ \t]*$")
 
 (defconst restclient-content-type-regexp
   "^Content-[Tt]ype: \\(\\w+\\)/\\(?:[^\\+\r\n]*\\+\\)*\\([^;\r\n]+\\)")
@@ -503,12 +503,14 @@ bound to C-c C-r."
 
 (defun restclient-read-file (path)
   (with-temp-buffer
-    (insert-file-contents path)
+    (insert-file-contents (expand-file-name path))
     (buffer-string)))
 
 (defun restclient-parse-body (entity vars)
   (if (= 0 (or (string-match restclient-file-regexp entity) 1))
-      (restclient-read-file (match-string 1 entity))
+			(if (string= ":" (match-string 1 entity))
+					(restclient-replace-all-in-string vars (restclient-read-file (match-string 2 entity)))
+				(restclient-read-file (match-string 2 entity)))
     (restclient-replace-all-in-string vars entity)))
 
 (defun restclient-parse-hook (cb-type args-offset args)
@@ -531,13 +533,15 @@ bound to C-c C-r."
 (defun restclient-get-var-at-point (var-name buffer-name buffer-pos)
   (message (format "getting var %s form %s at %s" var-name buffer-name buffer-pos))
   (let* ((vars-at-point  (save-excursion
-			   (switch-to-buffer buffer-name)
-			   (goto-char buffer-pos)
-			   ;; if we're called from a restclient buffer we need to lookup vars before the current hook or evar
-			   ;; outside a restclient buffer only globals are available so moving the point wont matter
-			   (re-search-backward "^:\\|->" (point-min) t)
-			   (restclient-find-vars-before-point))))
-    (restclient-replace-all-in-string vars-at-point (cdr (assoc var-name vars-at-point)))))
+													 (switch-to-buffer buffer-name)
+													 (goto-char buffer-pos)
+													 ;; if we're called from a restclient buffer we need to lookup vars before the current hook or evar
+													 ;; outside a restclient buffer only globals are available so moving the point wont matter
+													 (re-search-backward "^:\\|->" (point-min) t)
+													 (restclient-find-vars-before-point))))
+		(if-let (value (cdr (assoc var-name vars-at-point)))
+				(restclient-replace-all-in-string vars-at-point value)
+			nil)))
 
 (defmacro restclient-get-var (var-name)
   (let ((buf-name (buffer-name (current-buffer)))
@@ -560,13 +564,26 @@ bound to C-c C-r."
             (url (string-trim (match-string-no-properties 2)))
             (vars (restclient-find-vars-before-point))
             (headers '()))
+				(unless (or (string-prefix-p "http://" url)
+										(string-prefix-p "https://" url))
+					(if-let (base-uri (and (string-prefix-p "/" url)
+																 (restclient-get-var-at-point
+																	":base-uri"
+																	(buffer-name (current-buffer))
+																	(point))))
+							(setq url (concat (restclient-get-var-at-point
+																 ":base-uri"
+																 (buffer-name (current-buffer))
+																 (point))
+																url))
+						(user-error "url MUST start with `/' and `:base-uri' must be defined")))
         (forward-line)
         (while (cond
-		((looking-at restclient-response-hook-regexp)
-		 (when-let (hook-function (restclient-parse-hook (match-string-no-properties 2)
-								 (match-end 2)
-								 (match-string-no-properties 3)))
-		   (push hook-function restclient-curr-request-functions)))
+								((looking-at restclient-response-hook-regexp)
+								 (when-let (hook-function (restclient-parse-hook (match-string-no-properties 2)
+																																 (match-end 2)
+																																 (match-string-no-properties 3)))
+									 (push hook-function restclient-curr-request-functions)))
                 ((and (looking-at restclient-header-regexp) (not (looking-at restclient-empty-line-regexp)))
                  (setq headers (cons (restclient-replace-all-in-header vars (restclient-make-header)) headers)))
                 ((looking-at restclient-use-var-regexp)
@@ -574,8 +591,8 @@ bound to C-c C-r."
           (forward-line))
         (when (looking-at restclient-empty-line-regexp)
           (forward-line))
-	(when restclient-curr-request-functions
-	  (add-hook 'restclient-response-loaded-hook 'restclient-single-request-function))
+				(when restclient-curr-request-functions
+					(add-hook 'restclient-response-loaded-hook 'restclient-single-request-function))
         (let* ((cmax (restclient-current-max))
                (entity (restclient-parse-body (buffer-substring (min (point) cmax) cmax) vars))
                (url (restclient-replace-all-in-string vars url)))
@@ -608,6 +625,70 @@ bound to C-c C-r."
   (let ((form (macroexpand-all (read (current-buffer)))))
     (lambda ()
       (eval form))))
+
+(defun restclient--select-method (table prompt &optional format)
+	(let (allowed-keys rtn pressed formatter buffer (inhibit-quit t))
+		(save-window-excursion
+			(setq buffer (switch-to-buffer-other-window "*resclient-select-method*"))
+			(fit-window-to-buffer
+			 (get-buffer-window buffer)
+			 10 7)
+			(catch 'exit
+				(while t
+					(erase-buffer)
+					(font-lock-mode 1)
+					(insert prompt "\n\n")
+					(setq allowed-keys (mapcar #'car table))
+					(dolist (row table)
+						(insert "\t["
+										(propertize (car row)
+																'font-lock-face
+																'font-lock-constant-face)
+										"] "
+										(propertize (cdr row)
+																'font-lock-face
+																'font-lock-function-name-face)))
+					(insert "\n\n\tUse "
+									(propertize "q"
+															'font-lock-face
+															'font-lock-constant-face)
+									" or "
+									(propertize "C-g"
+															'font-lock-face
+															'font-lock-constant-face)
+									" to exit without inserting")
+					(push "\C-g" allowed-keys)
+					(push "q" allowed-keys)
+					(goto-char (point-min))
+					(message prompt)
+					(setq pressed (char-to-string (read-char-exclusive)))
+					(while (not (member pressed allowed-keys))
+						(message "Invalid key `%s'" pressed)
+						(sit-for 1)
+						(message prompt)
+						(setq pressed (char-to-string (read-char-exclusive))))
+					(when (or (equal pressed "\C-g")
+										(equal pressed "q"))
+						(kill-buffer buffer)
+						(error "Abort" ))
+					(throw 'exit
+								 (setq rtn (seq-find (lambda (x) (string= pressed (car x))) table))))))
+		(when buffer (kill-buffer buffer))
+		rtn))
+
+(defun restclient-insert-request ()
+	(interactive)
+	(let ((table '(("g" . "GET")
+								 ("p" . "POST")
+								 ("d" . "DELETE")
+								 ("u" . "PUT")
+								 ("h" . "HEAD")
+								 ("o" . "OPTIONS")
+								 ("t" . "PATCH"))))
+		(when-let (selected (restclient--select-method table "Select method: "))
+			(insert "### " (cdr selected) "\n"
+							(cdr selected) " "))))
+
 
 (restclient-register-result-func
  "run-hook" #'restclient-elisp-result-function
@@ -783,16 +864,17 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
 
 (defvar restclient-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-c") 'restclient-http-send-current-stay-in-window)
-    (define-key map (kbd "C-c C-r") 'restclient-http-send-current-raw)
-    (define-key map (kbd "C-c C-v") 'restclient-http-send-current)
-    (define-key map (kbd "C-c C-b") 'restclient-http-send-current-suppress-response-buffer)
-    (define-key map (kbd "C-c C-n") 'restclient-jump-next)
-    (define-key map (kbd "C-c C-p") 'restclient-jump-prev)
-    (define-key map (kbd "C-c C-.") 'restclient-mark-current)
-    (define-key map (kbd "C-c C-u") 'restclient-copy-curl-command)
-    (define-key map (kbd "C-c n n") 'restclient-narrow-to-current)
-    (define-key map (kbd "C-c C-i") 'restclient-show-info)
+    (keymap-set map "C-c C-c" #'restclient-http-send-current-stay-in-window)
+    (keymap-set map "C-c C-r" #'restclient-http-send-current-raw)
+    (keymap-set map "C-c C-v" #'restclient-http-send-current)
+    (keymap-set map "C-c C-b" #'restclient-http-send-current-suppress-response-buffer)
+    (keymap-set map "C-c C-n" #'restclient-jump-next)
+    (keymap-set map "C-c C-p" #'restclient-jump-prev)
+    (keymap-set map "C-c C-." #'restclient-mark-current)
+    (keymap-set map "C-c C-u" #'restclient-copy-curl-command)
+    (keymap-set map "C-c n n" #'restclient-narrow-to-current)
+    (keymap-set map "C-c C-i" #'restclient-show-info)
+    (keymap-set map "C-c i" #'restclient-insert-request)
     map)
   "Keymap for restclient-mode.")
 
@@ -838,5 +920,9 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
 
 (eval-after-load 'jq-mode
   '(ignore-errors (require 'restclient-jq)))
+
+(with-eval-after-load 'golden-ratio
+	(add-to-list 'golden-ratio-exclude-buffer-names
+							 "*resclient-select-method*"))
 
 ;;; restclient-mode.el ends here

@@ -7,8 +7,6 @@ This is a tool to manually explore and test HTTP REST webservices.
 Runs queries from a plain-text query sheet,
 displays results as a pretty-printed XML, JSON and even images.
 
-![](http://i.imgur.com/QtCID.png)
-
 # Usage
 
 You can easily install `restclient-mode` using `use-package`. Clone
@@ -27,72 +25,75 @@ and supports a few additional keypresses:
 
 | Keybinding | Description |
 |----|----|
-| `C-c C-c` | runs the query under the cursor, tries to pretty-print the response (if possible) |
-| `C-c C-r` | same, but doesn't do anything with the response, just shows the buffer |
-| `C-c C-v` | same as `C-c C-c`, but switches focus to other window |
-| `C-c C-b` | same as `C-c C-c`, but doesn't show response buffer |
-| `C-c C-p` | jump to the previous query |
-| `C-c C-n` | jump to the next query |
-| `C-c C-.` | mark the query under the cursor |
-| `C-c C-u` | copy query under the cursor as a curl command |
-| `C-c C-g` | start a [helm](https://emacs-helm.github.io/helm/) session with sources for variables and requests (if helm is available, of course) |
-| `C-c n n` | narrow to region of current request (including headers) |
-| `TAB`: hi |e/show current request body, only if |
-| `C-c C-a` | show all collapsed regions |
-| `C-c C-i` | show information on restclient variables at point |
+| `C-c C-c` | Runs the query under the cursor, tries to pretty-print the response (if possible) |
+| `C-c C-r` | Same, but doesn't do anything with the response, just shows the buffer |
+| `C-c C-v` | Same as `C-c C-c`, but switches focus to other window |
+| `C-c C-b` | Same as `C-c C-c`, but doesn't show response buffer |
+| `C-c C-p` | Jump to the previous query |
+| `C-c C-n` | Jump to the next query |
+| `C-c C-.` | Mark the query under the cursor |
+| `C-c C-u` | Copy query under the cursor as a curl command |
+| `C-c C-g` | Start a [helm](https://emacs-helm.github.io/helm/) session with sources for variables and requests (if helm is available, of course) |
+| `C-c n n` | Narrow to region of current request (including headers) |
+| `C-c i` | Insert new request prompting for method |
+| `TAB` | hide/show current request body |
+| `C-c C-a` | Show all collapsed regions |
+| `C-c C-i` | Show information on restclient variables at point |
 
 The last two functions are implemented as `restclient-outline-mode` minor mode, which is activated by default via hook for major mode. Remove this hook using `(remove-hook 'restclient-mode-hook 'restclient-outline-mode)` if you don't wish to have this behaviour, or it clashes with any other binding for `TAB` like autocomplete.
 
 Query file example:
 
-    # -*- restclient -*-
-    #
-    # Gets  all Github APIs, formats JSON, shows response status and headers underneath.
-    # Also sends a User-Agent header, because the Github API requires this.
-    #
-    GET https://api.github.com
-    User-Agent: Emacs Restclient
+```
+# -*- mode: restclient -*-
+#
+# Gets  all Github APIs, formats JSON, shows response status and headers underneath.
+# Also sends a User-Agent header, because the Github API requires this.
+#
+GET https://api.github.com
+User-Agent: Emacs Restclient
 
-    #
-    # XML is supported - highlight, pretty-print
-    #
-    GET http://www.redmine.org/issues.xml?limit=10
+#
+# XML is supported - highlight, pretty-print
+#
+GET http://www.redmine.org/issues.xml?limit=10
 
-    #
-    # It can even show an image!
-    #
-    GET http://upload.wikimedia.org/wikipedia/commons/6/63/Wikipedia-logo.png
-    #
-    # A bit of json GET, you can pass headers too
-    #
-    GET http://jira.atlassian.com/rest/api/latest/issue/JRA-9
-    User-Agent: Emacs24
-    Accept-Encoding: compress, gzip
+#
+# It can even show an image!
+#
+GET http://upload.wikimedia.org/wikipedia/commons/6/63/Wikipedia-logo.png
+#
+# A bit of json GET, you can pass headers too
+#
+GET http://jira.atlassian.com/rest/api/latest/issue/JRA-9
+User-Agent: Emacs24
+Accept-Encoding: compress, gzip
 
-    #
-    # Post works too, entity just goes after an empty line. Same is for PUT.
-    #
-    POST https://jira.atlassian.com/rest/api/2/search
-    Content-Type: application/json
+#
+# Post works too, entity just goes after an empty line. Same is for PUT.
+#
+POST https://jira.atlassian.com/rest/api/2/search
+Content-Type: application/json
 
-    {
-            "jql": "project = HCPUB",
-            "startAt": 0,
-            "maxResults": 15,
-            "fields": [
-                    "summary",
-                    "status",
-                    "assignee"
-            ]
-    }
-    #
-    # And delete, will return not-found error...
-    #
-    DELETE https://jira.atlassian.com/rest/api/2/version/20
+{
+        "jql": "project = HCPUB",
+        "startAt": 0,
+        "maxResults": 15,
+        "fields": [
+                "summary",
+                "status",
+                "assignee"
+        ]
+}
+#
+# And delete, will return not-found error...
+#
+DELETE https://jira.atlassian.com/rest/api/2/version/20
 
-    # Set a variable to the value of your ip address using a jq expression
-    GET http://httpbin.org/ip
-    -> jq-set-var :my-ip .origin
+# Set a variable to the value of your ip address using a jq expression
+GET http://httpbin.org/ip
+-> jq-set-var :my-ip .origin
+```
 
 Lines starting with `#` are considered comments AND also act as separators.
 
@@ -104,81 +105,104 @@ More examples can be found in the `examples` directory.
 
 You declare a variable like this:
 
-    :myvar = the value
+```
+:myvar = the value
+```
 
 or like this:
 
-    :myvar := (some (artbitrary 'elisp)
+```
+:myvar := (some (artbitrary 'elisp)
+```
 
 In second form, the value of variable is evaluated as Emacs Lisp form immediately. Evaluation of variables is done from top to bottom. Only one one-line form for each variable is allowed, so use `(progn ...)` and some virtual line wrap mode if you need more. There's no way to reference earlier declared _restclient_ variables, but you can always use `setq` to save state.
 
 Variables can be multiline too:
 
-    :myvar = <<
-    Authorization: :my-auth
-    Content-Type: application/json
-    User-Agent: SomeApp/1.0
-    #
+```
+:myvar = <<
+Authorization: :my-auth
+Content-Type: application/json
+User-Agent: SomeApp/1.0
+#
+```
 
 or
 
-    :myvar := <<
-    (some-long-elisp
-        (code spanning many lines)
-    #
+```
+:myvar := <<
+(some-long-elisp
+    (code spanning many lines)
+#
+```
 
 `<<` is used to mark a start of multiline value, the actual value is starting on the next line then. The end of such variable value is the same comment marker `#` and last end of line doesn't count, same is for request bodies.
 
 After the var is declared, you can use it in the URL, the header values
 and the body.
 
-    # Some generic vars
+```
+# Some generic vars
 
-    :my-auth = 319854857345898457457
-    :my-headers = <<
-    Authorization: :my-auth
-    Content-Type: application/json
-    User-Agent: SomeApp/1.0
-    #
+:my-auth = 319854857345898457457
+:my-headers = <<
+Authorization: :my-auth
+Content-Type: application/json
+User-Agent: SomeApp/1.0
+#
 
-    # Update a user's name
+# Update a user's name
 
-    :user-id = 7
-    :the-name := (format "%s %s %d" 'Neo (md5 "The Chosen") (+ 100 1))
+:user-id = 7
+:the-name := (format "%s %s %d" 'Neo (md5 "The Chosen") (+ 100 1))
 
-    PUT http://localhost:4000/users/:user-id/
-    :my-headers
+PUT http://localhost:4000/users/:user-id/
+:my-headers
 
-    { "name": ":the-name" }
+{ "name": ":the-name" }
+```
 
-Varaibles can also be set based on the body of a response using the per-request hooks
+Variables can also be set based on the body of a response using the per-request hooks
 
-    # set a variable :my-ip to the value of your ip address using elisp evaluated in the result buffer
-    GET http://httpbin.org/ip
-    -> run-hook (restclient-set-var ":my-ip" (cdr (assq 'origin (json-read))))
+```
+# set a variable :my-ip to the value of your ip address using elisp evaluated in the result buffer
+GET http://httpbin.org/ip
+-> run-hook (restclient-set-var ":my-ip" (cdr (assq 'origin (json-read))))
 
-    # same thing with jq if it's installed
-    GET http://httpbin.org/ip
-    -> jq-set-var :my-ip .origin
+# same thing with jq if it's installed
+GET http://httpbin.org/ip
+-> jq-set-var :my-ip .origin
 
-    # set a variable :my-var using a more complex jq expression (requires jq-mode)
-    GET https://httpbin.org/json
-    -> jq-set-var :my-var .slideshow.slides[0].title
+# set a variable :my-var using a more complex jq expression (requires jq-mode)
+GET https://httpbin.org/json
+-> jq-set-var :my-var .slideshow.slides[0].title
 
-    # hooks come before the body on POST
-    POST http://httpbin.org/post
-    -> jq-set-var :test .json.test
+# hooks come before the body on POST
+POST http://httpbin.org/post
+-> jq-set-var :test .json.test
 
-    {"test": "foo"}
+{"test": "foo"}
+```
 
 # File uploads
 
 Restclient now allows to specify file path to use as a body, like this:
 
-    POST http://httpbin.org/post
-    Content-type: text/plain
+```
+POST http://httpbin.org/post
+Content-type: text/plain
 
-    < /etc/passwd
+< /etc/passwd
+```
+
+Use `<:` to replace variable placeholders in the file
+
+```
+POST http://httpbin.org/post
+Content-type: application/json
+
+<: with-vars.json
+```
 
 ### Caveats:
 

@@ -654,20 +654,24 @@ bound to C-c C-r."
   (interactive)
   (restclient-http-parse-current-and-do
    '(lambda (method url headers entity)
-      (let ((header-args
-             (apply 'append
-                    (mapcar (lambda (header)
-                              (list "-H" (format "%s: %s" (car header) (cdr header))))
-                            headers))))
-        (kill-new (concat "curl "
-                          (mapconcat 'shell-quote-argument
-                                     (append '("-i")
-                                             header-args
-                                             (list (concat "-X" method))
-                                             (list url)
-                                             (when (> (string-width entity) 0)
-                                               (list "-d" entity)))
-                                     " "))))
+      (let ((include-arg (if restclient-response-body-only
+                             ""
+                           "-i"))
+            (header-args
+             (mapconcat (lambda (header)
+                          (format "-H \"%s: %s\" " (car header) (cdr header)))
+                        headers))
+            (method-arg (format "-X %s" method))
+            (url-arg (format "\"%s\"" url))
+            (body-arg (if (< 0 (length entity))
+                          (format "-d '%s'" entity)
+                        "")))
+        (kill-new (format  "curl %s %s %s %s %s"
+                           include-arg
+                           header-args
+                           method-arg
+                           url-arg
+                           body-arg)))
       (message "curl command copied to clipboard."))))
 
 

@@ -664,7 +664,8 @@ bound to C-c C-r."
             (method-arg (format "-X %s" method))
             (url-arg (format "\"%s\"" url))
             (body-arg (if (< 0 (length entity))
-                          (format "-d '%s'" entity)
+                          (format "-d '%s'"
+                                  (replace-regexp-in-string "'" "'\\\\''" entity))
                         "")))
         (kill-new (format  "curl %s %s %s %s %s"
                            include-arg

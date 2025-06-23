@@ -614,8 +614,9 @@ bound to C-c C-r."
 
 (defun restclient-single-request-function ()
   (dolist (f restclient-curr-request-functions)
-    (ignore-errors
-      (funcall f)))
+    (save-excursion
+      (ignore-errors
+       (funcall f))))
   (setq restclient-curr-request-functions nil)
   (remove-hook 'restclient-response-loaded-hook 'restclient-single-request-function))
 

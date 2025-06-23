@@ -497,22 +497,37 @@ ENV-NAME is the name of a specific environment defined in ENV-FILE.
 
 The special environment name `$shared' will always load in addition to the requested env,
 with lower priority."
-  (interactive "fEnvironment file name:\nsEnvironment name:")
+  (interactive (let* ((default-dir (when restclient-current-env-file
+                                     (file-name-directory restclient-current-env-file)))
+                      (default-file (when restclient-current-env-file
+                                      (file-name-nondirectory restclient-current-env-file)))
+                      (filename
+                       (read-file-name "Environment file name: "
+                                       default-dir default-file t))
+                      (envs (mapcar #'car (restclient-parse-env-file filename))))
+                 (list filename (completing-read "Environment name: " envs nil t))))
   (setq restclient-current-env-file env-file)
   (setq restclient-current-env-name env-name)
   (restclient-reload-current-env))
+
+(defun restclient-parse-env-file (filename)
+  (let* ((json-key-type 'string)
+         (envs (json-read-file filename)))
+      (when (assoc "rest-client.environmentVariables" envs)
+        (setq envs (cdr (assoc "rest-client.environmentVariables" envs))))
+      envs))
 
 (defun restclient-reload-current-env ()
   "Refresh variable definitions from current environment definition."
   (interactive)
   (when (and restclient-current-env-file restclient-current-env-name)
-    (let* ((json-key-type 'string)
-           (envs (json-read-file restclient-current-env-file)))
-      (when (assoc "rest-client.environmentVariables" envs)
-        (setq envs (cdr (assoc "rest-client.environmentVariables" envs))))
+    (let* ((envs (restclient-parse-env-file restclient-current-env-file))
+           (shared-name "$shared")
+           (nonshared (when (not (equal restclient-current-env-name shared-name))
+                        (cdr (assoc restclient-current-env-name envs)))))
       (setq restclient-var-defaults
-            (append (cdr (assoc restclient-current-env-name envs))
-                    (cdr (assoc "$shared" envs)))))
+            (append nonshared
+                    (cdr (assoc shared-name envs)))))
     (message "Environment \"%s\" loaded" restclient-current-env-name)))
 
 (defun restclient-find-vars-before-point ()
@@ -788,13 +803,15 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
 	  (var-row (car dv) (cdr dv)))
 	(var-table-footer)
 
-	;;    (insert ":Info:\n Dynamic vars defined by request hooks or with calls to restclient-set-var\n:END:")
-
 	(var-table "Vars at current position")
 	(dolist (dv (non-overidden-vars-at-point))
 	  (var-row (car dv) (cdr dv)))
 	(var-table-footer)
 
+        (insert "* Active environment\n|--|\n|File|Environment name|\n|--|\n")
+        (when (or restclient-current-env-file restclient-current-env-name)
+          (insert "|" (or restclient-current-env-file "") "|" (or restclient-current-env-name "") "|\n"))
+        (var-table-footer)
 
 	;; registered callbacks
 	(var-table "Registered request hook types")

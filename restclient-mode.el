@@ -583,17 +583,12 @@ bound to C-c C-r."
 						(restclient-pre-request-functions nil))
 				(unless (or (string-prefix-p "http://" url)
 										(string-prefix-p "https://" url))
-					(if-let (base-uri (and (string-prefix-p "/" url)
-																 (restclient-get-var-at-point
-																	restclient-base-uri-var
-																	(buffer-name (current-buffer))
-																	(point))))
-							(setq url (concat (restclient-get-var-at-point
-																 restclient-base-uri-var
-																 (buffer-name (current-buffer))
-																 (point))
-																url))
-						(user-error "url MUST start with `/' and `" restclient-base-uri-var "' must be defined")))
+					(if-let (base-uri
+									 (and (string-prefix-p "/" url)
+												(alist-get ":base-uri" vars nil nil #'string=)))
+							(setq url (concat base-uri url))
+						(user-error "url MUST start with `/' and `"
+												restclient-base-uri-var "' must be defined")))
         (forward-line)
         (while (cond
 								((looking-at restclient-response-hook-regexp)

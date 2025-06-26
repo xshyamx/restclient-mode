@@ -111,7 +111,7 @@ GET /json
 
 In the above example the request will be sent to `http://httbin.org/json`. Any request using the relative uri will use the same `:base-uri` to override use the full url.
 
-**NOTE**: There can be multiple assignments to `:base-uri` but, the first one in the buffer seems to take precedence.
+**NOTE**: There can be multiple assignments to `:base-uri` but, the first one going backwards from the request will be used.
 
 # In-buffer variables
 
@@ -252,7 +252,7 @@ For example, `GET http://example.org` would produce the following buffer names o
 - `*HTTP GET http://example.org*<2>`
 - `*HTTP GET http://example.org*<3>`
 
-### restclient-same-buffer-response-name
+### restclient-response-buffer-name
 
 __Default: \*HTTP Response\*__
 

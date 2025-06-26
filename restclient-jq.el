@@ -36,7 +36,7 @@
 
   (with-temp-buffer
     (let ((output (current-buffer)))
-      (with-current-buffer restclient-same-buffer-response-name
+      (with-current-buffer restclient-response-buffer-name
         (call-process-region
          (point-min)
          (restclient-jq-result-end-point)
@@ -47,7 +47,7 @@
          shell-command-switch
          (format "%s %s %s"
                  jq-interactive-command
-		 "-r"
+								 "-r"
                  (shell-quote-argument jq-pattern))))
       (string-trim (buffer-string)))))
 

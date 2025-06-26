@@ -165,6 +165,15 @@ Content-Type: application/json
 		:entity (restclient-request-entity request))
 <: with-vars.json
 
+### POST
+POST /post?q=4
+-> pre-request (progn (setf (restclient-request-headers request)
+							 (append (list '("Content-Type" . "application/json")
+							 (cons "Content-Digest-Digest"
+							 (concat "sha-256=" (secure-hash 'sha256 (restclient-request-entity request )))))
+							 (restclient-request-headers request)))
+				 request)
+<: with-vars.json
 
 # File upload
 PUT http://httpbin.org/put

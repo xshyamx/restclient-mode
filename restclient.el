@@ -5,7 +5,10 @@
 ;; Author: Pavel Kurnosov <pashky@gmail.com>
 ;; Maintainer: Peder O. Klingenberg <peder@klingenberg.no>
 ;; Created: 01 Apr 2012
-;; Keywords: http
+;; Keywords: http comm tools
+;; URL: https://github.com/emacsorphanage/restclient
+;; Package-Requires: ((emacs "26.1"))
+;; Version: 1.0
 
 ;; This file is not part of GNU Emacs.
 ;; This file is public domain software. Do what you want.
@@ -109,7 +112,9 @@
 
 (defface restclient-variable-usage-face
   '((t (:inherit restclient-variable-name-face)))
-  "Face for variable usage (only used when headers/body is represented as a single variable, not highlighted when variable appears in the middle of other text)."
+  "Face for variable usage (only used when headers/body is represented
+as a single variable, not highlighted when variable appears in the middle
+of other text)."
   :group 'restclient-faces)
 
 (defface restclient-method-face
@@ -188,7 +193,9 @@
   "Hook run after data is loaded into response buffer.")
 
 (defcustom restclient-vars-max-passes 10
-  "Maximum number of recursive variable references. This is to prevent hanging if two variables reference each other directly or indirectly."
+  "Maximum number of recursive variable references.
+This is to prevent hanging if two variables reference each other directly or
+indirectly."
   :group 'restclient
   :type 'integer)
 
@@ -401,7 +408,8 @@ The buffer contains the raw HTTP response sent by the server."
             (switch-to-buffer-other-window (current-buffer))))))))
 
 (defun restclient-decode-response (raw-http-response-buffer target-buffer-name same-name)
-  "Decode the HTTP response using the charset (encoding) specified in the Content-Type header. If no charset is specified, default to UTF-8."
+  "Decode the HTTP response using the charset (encoding) specified in the
+Content-Type header. If no charset is specified, default to UTF-8."
   (let* ((charset-regexp "^Content-Type.*charset=\\([-A-Za-z0-9]+\\)")
          (image? (save-excursion
                    (search-forward-regexp "^Content-Type.*[Ii]mage" nil t)))
@@ -443,15 +451,15 @@ The buffer contains the raw HTTP response sent by the server."
     (beginning-of-line)
     (if (looking-at restclient-comment-start-regexp)
         (if (re-search-forward restclient-comment-not-regexp (point-max) t)
-            (point-at-bol) (point-max))
+            (line-beginning-position) (point-max))
       (if (re-search-backward restclient-comment-start-regexp (point-min) t)
-          (point-at-bol 2)
+          (line-beginning-position 2)
         (point-min)))))
 
 (defun restclient-current-max ()
   (save-excursion
     (if (re-search-forward restclient-comment-start-regexp (point-max) t)
-        (max (- (point-at-bol) 1) 1)
+        (max (- (line-beginning-position) 1) 1)
       (progn (goto-char (point-max))
              (if (looking-at "^$") (- (point) 1) (point))))))
 
@@ -490,13 +498,13 @@ The buffer contains the raw HTTP response sent by the server."
 
 ENV-FILE is a json file as defined in
 https://learn.microsoft.com/en-us/aspnet/core/test/http-files?view=aspnetcore-9.0#environment-files.
-Alternatively, a VS Code settings file with the environments defined under the key
-rest-client.environmentVariables is acceptable.
+Alternatively, a VS Code settings file with the environments defined under the
+key rest-client.environmentVariables is acceptable.
 
 ENV-NAME is the name of a specific environment defined in ENV-FILE.
 
-The special environment name `$shared' will always load in addition to the requested env,
-with lower priority."
+The special environment name `$shared' will always load in addition to the
+requested env, with lower priority."
   (interactive (let* ((default-dir (when restclient-current-env-file
                                      (file-name-directory restclient-current-env-file)))
                       (default-file (when restclient-current-env-file
@@ -586,7 +594,7 @@ bound to C-c C-r."
   (restclient-replace-path-with-contents (restclient-replace-all-in-string vars entity)))
 
 (defun restclient-parse-hook (cb-type args-offset args)
-  (if-let ((handler (assoc cb-type restclient-result-handlers)))
+  (if-let* ((handler (assoc cb-type restclient-result-handlers)))
       (funcall (cadr handler) args args-offset)
     `(lambda ()
        (message "Unknown restclient hook type %s" ,cb-type))))
@@ -647,9 +655,9 @@ bound to C-c C-r."
         (forward-line)
         (while (cond
 		((looking-at restclient-response-hook-regexp)
-		 (when-let (hook-function (restclient-parse-hook (match-string-no-properties 2)
-								 (match-end 2)
-								 (match-string-no-properties 3)))
+		 (when-let* ((hook-function (restclient-parse-hook (match-string-no-properties 2)
+				 				   (match-end 2)
+					 			   (match-string-no-properties 3))))
 		   (push hook-function restclient-curr-request-functions)))
                 ((and (looking-at restclient-header-regexp) (not (looking-at restclient-empty-line-regexp)))
                  (setq headers (cons (restclient-replace-all-in-header vars (restclient-make-header)) headers)))
@@ -715,7 +723,8 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
 
 ;;;###autoload
 (defun restclient-http-send-current-raw ()
-  "Sends current request and get raw result (no reformatting or syntax highlight of XML, JSON or images)."
+  "Sends current request and get raw result
+(no reformatting or syntax highlight of XML, JSON or images)."
   (interactive)
   (restclient-http-send-current t))
 

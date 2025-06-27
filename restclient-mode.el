@@ -210,13 +210,16 @@ hanging if two variables reference each other directly or indirectly."
   (concat "^\\(:[^:= ]+\\)[ \t]*\\(:?\\)=[ \t]*\\(<<[ \t]*\n\\(\\(.*\n\\)*?\\)" restclient-comment-separator "\\|\\([^<].*\\)$\\)"))
 
 (defconst restclient-svar-regexp
-  "^\\(:[^:= ]+\\)[ \t]*=[ \t]*\\(.+?\\)$")
+  "^\\(:[^:= ]+\\)[ \t]*=[ \t]*\\(.+?\\)$"
+  "String variable")
 
 (defconst restclient-evar-regexp
-  "^\\(:[^: ]+\\)[ \t]*:=[ \t]*\\(.+?\\)$")
+  "^\\(:[^: ]+\\)[ \t]*:=[ \t]*\\(.+?\\)$"
+  "Elisp variable")
 
 (defconst restclient-mvar-regexp
-  "^\\(:[^: ]+\\)[ \t]*:?=[ \t]*\\(<<\\)[ \t]*$")
+  "^\\(:[^: ]+\\)[ \t]*:?=[ \t]*\\(<<\\)[ \t]*$"
+  "Multi-line variable")
 
 (defconst restclient-file-regexp
   "^<\\(:?\\)[ \t]*\\([^<>\n\r]+\\)[ \t]*$")

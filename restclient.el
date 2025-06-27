@@ -3,7 +3,7 @@
 ;; Public domain.
 
 ;; Author: Pavel Kurnosov <pashky@gmail.com>
-;; Maintainer: Pavel Kurnosov <pashky@gmail.com>
+;; Maintainer: Peder O. Klingenberg <peder@klingenberg.no>
 ;; Created: 01 Apr 2012
 ;; Keywords: http
 

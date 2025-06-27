@@ -76,7 +76,7 @@
                                            ("image/jpg" . image-mode)
                                            ("image/gif" . image-mode)
                                            ("text/html" . html-mode))
-  "An association list mapping content types to buffer modes"
+  "An association list mapping content types to buffer modes."
   :group 'restclient
   :type '(alist :key-type string :value-type symbol))
 
@@ -86,7 +86,7 @@
   :type 'boolean)
 
 (defgroup restclient-faces nil
-  "Faces used in Restclient Mode"
+  "Faces used in Restclient Mode."
   :group 'restclient
   :group 'faces)
 
@@ -102,7 +102,7 @@
 
 (defface restclient-variable-elisp-face
   '((t (:inherit font-lock-function-name-face)))
-  "Face for variable value (Emacs lisp)."
+  "Face for variable value (Emacs Lisp)."
   :group 'restclient-faces)
 
 (defface restclient-variable-multiline-face
@@ -112,9 +112,9 @@
 
 (defface restclient-variable-usage-face
   '((t (:inherit restclient-variable-name-face)))
-  "Face for variable usage (only used when headers/body is represented
-as a single variable, not highlighted when variable appears in the middle
-of other text)."
+  "Face for variable usage.
+\(only used when headers/body is represented as a single variable, not
+highlighted when variable appears in the middle of other text)."
   :group 'restclient-faces)
 
 (defface restclient-method-face
@@ -124,7 +124,7 @@ of other text)."
 
 (defface restclient-url-face
   '((t (:inherit font-lock-function-name-face)))
-  "Face for variable value (Emacs lisp)."
+  "Face for variable value (Emacs Lisp)."
   :group 'restclient-faces)
 
 (defface restclient-file-upload-face
@@ -164,8 +164,8 @@ of other text)."
 (defvar restclient-request-time-end nil)
 
 (defvar restclient-var-overrides nil
-  "An alist of vars that will override any set in the file,
-  also where dynamic vars set on callbacks are stored.")
+  "An alist of vars that will override any set in the file.
+Also where dynamic vars set on callbacks are stored.")
 
 (defvar restclient-var-defaults nil
   "An alist of fallback values for vars not defined elsewhere.")
@@ -178,10 +178,10 @@ of other text)."
 
 (defvar restclient-result-handlers '()
   "A registry of available completion hooks.
-   Stored as an alist of name -> (hook-creation-func . description)")
+Stored as an alist of name -> (hook-creation-func . description)")
 
 (defvar restclient-curr-request-functions nil
-  "A list of functions to run once when the next request is loaded")
+  "A list of functions to run once when the next request is loaded.")
 
 (defvar restclient-response-loaded-hook nil
   "Hook run after response buffer is formatted.")
@@ -242,17 +242,20 @@ indirectly."
 ;; This API is meant to be usable without constant asking for username
 ;; and password.
 (defadvice url-http-handle-authentication (around restclient-fix)
+  "Disable interactive request for username/password."
   (if restclient-within-call
       (setq ad-return-value t)
     ad-do-it))
 (ad-activate 'url-http-handle-authentication)
 
 (defadvice url-cache-extract (around restclient-fix-2)
+  "Disable cache."
   (unless restclient-within-call
     ad-do-it))
 (ad-activate 'url-cache-extract)
 
 (defadvice url-http-user-agent-string (around restclient-fix-3)
+  "Disable user-agent."
   (if restclient-within-call
       (setq ad-return-value nil)
     ad-do-it))
@@ -296,6 +299,8 @@ indirectly."
                                              (format "*HTTP %s %s*" method url))) handle-args) nil restclient-inhibit-cookies)))
 
 (defun restclient-prettify-response (method url)
+  "Format the result of the API call in a pleasing way.
+METHOD and URL are displayed along with the response headers."
   (save-excursion
     (let ((start (point)) (guessed-mode) (end-of-headers))
       (while (and (not (looking-at restclient-empty-line-regexp))
@@ -379,6 +384,7 @@ indirectly."
 		(comment-region hstart (point))))))))))
 
 (defun restclient-prettify-json-unicode ()
+  "Convert hex representations of unicode to characters."
   (save-excursion
     (goto-char (point-min))
     (while (re-search-forward "\\\\[Uu]\\([0-9a-fA-F]\\{4\\}\\)" nil t)
@@ -386,7 +392,15 @@ indirectly."
 
 (defun restclient-http-handle-response (status method url bufname raw stay-in-window suppress-response-buffer)
   "Switch to the buffer returned by `url-retrieve'.
-The buffer contains the raw HTTP response sent by the server."
+The buffer contains the raw HTTP response sent by the server.
+STATUS: http status of the response.
+METHOD: http method of the request.
+URL: url of the request.
+BUFNAME; the name of the buffer in which to display results
+RAW: if non-nil, the raw response will be displayed, instead of a pretty-printed
+     version.
+STAY-IN-WINDOW: if non-nil, do not switch to the output buffer, only show it.
+SUPPRESS-RESPONSE-BUFFER: do not show the reponse at all."
   (setq restclient-within-call nil)
   (setq restclient-request-time-end (current-time))
   (if (= (point-min) (point-max))
@@ -408,8 +422,15 @@ The buffer contains the raw HTTP response sent by the server."
             (switch-to-buffer-other-window (current-buffer))))))))
 
 (defun restclient-decode-response (raw-http-response-buffer target-buffer-name same-name)
-  "Decode the HTTP response using the charset (encoding) specified in the
-Content-Type header. If no charset is specified, default to UTF-8."
+  "Decode the HTTP response.
+Use the charset (encoding) specified in the Content-Type header.  If no
+charset is specified, default to UTF-8.
+RAW-HTTP-RESPONSE-BUFFER: the buffer where the URL library has deposited the
+   reponse.
+TARGET-BUFFER-NAME: the name of the buffer into which we will place the decoded
+   result.
+SAME-NAME: if non-nil, reuse the target buffer if it exists, otherwise generate
+   a fresh buffer."
   (let* ((charset-regexp "^Content-Type.*charset=\\([-A-Za-z0-9]+\\)")
          (image? (save-excursion
                    (search-forward-regexp "^Content-Type.*[Ii]mage" nil t)))
@@ -447,6 +468,7 @@ Content-Type header. If no charset is specified, default to UTF-8."
           decoded-http-response-buffer)))))
 
 (defun restclient-current-min ()
+  "Return the position of the start of the current request."
   (save-excursion
     (beginning-of-line)
     (if (looking-at restclient-comment-start-regexp)
@@ -457,6 +479,7 @@ Content-Type header. If no charset is specified, default to UTF-8."
         (point-min)))))
 
 (defun restclient-current-max ()
+  "Return the position of the end of the current request."
   (save-excursion
     (if (re-search-forward restclient-comment-start-regexp (point-max) t)
         (max (- (line-beginning-position) 1) 1)
@@ -464,6 +487,9 @@ Content-Type header. If no charset is specified, default to UTF-8."
              (if (looking-at "^$") (- (point) 1) (point))))))
 
 (defun restclient-replace-all-in-string (replacements string)
+  "Replace variables in STRING.
+REPLACEMENTS is an alist containing the current variable values.
+Return a string with variables replaced with their values, possibly recursively."
   (if replacements
       (let ((current string)
             (pass restclient-vars-max-passes)
@@ -487,10 +513,16 @@ Content-Type header. If no charset is specified, default to UTF-8."
     string))
 
 (defun restclient-replace-all-in-header (replacements header)
+  "Calls `restclient-replace-all-in-string' on a header value.
+REPLACEMENTS is an alist containing the current variable values.
+HEADER is an alist element (<header-name> . <value>).
+Returns a new alist elements with the same header name, and a variable-expanded
+value."
   (cons (car header)
         (restclient-replace-all-in-string replacements (cdr header))))
 
 (defun restclient-chop (text)
+  "Remove newline at the end of TEXT, if any."
   (if text (replace-regexp-in-string "\n$" "" text) nil))
 
 (defun restclient-set-env (env-file env-name)
@@ -519,6 +551,9 @@ requested env, with lower priority."
   (restclient-reload-current-env))
 
 (defun restclient-parse-env-file (filename)
+  "Read environments from FILENAME.
+Environments contain sets of variable definitions.  A file can contain multiple
+environment definitions."
   (let* ((json-key-type 'string)
          (envs (json-read-file filename)))
       (when (assoc "rest-client.environmentVariables" envs)
@@ -539,6 +574,7 @@ requested env, with lower priority."
     (message "Environment \"%s\" loaded" restclient-current-env-name)))
 
 (defun restclient-find-vars-before-point ()
+  "Determine which variables are valid at the current position."
   (let ((vars nil)
         (bound (point)))
     (save-excursion
@@ -552,13 +588,18 @@ requested env, with lower priority."
       (append restclient-var-overrides vars restclient-var-defaults))))
 
 (defun restclient-eval-var (string)
+  "Evaluate the Lisp code contained in STRING.
+The result of the evaluation is returned as a string."
   (with-output-to-string (princ (eval (read string)))))
 
 (defun restclient-make-header (&optional string)
+  "Create an alist element from STRING.
+Match data must be set by caller."
   (cons (match-string-no-properties 1 string)
         (match-string-no-properties 2 string)))
 
 (defun restclient-parse-headers (string)
+  "Create a header alist from STRING."
   (let ((start 0)
         (headers '()))
     (while (string-match restclient-header-regexp string start)
@@ -567,22 +608,28 @@ requested env, with lower priority."
     headers))
 
 (defun restclient-get-response-headers ()
-  "Returns alist of current response headers. Works *only* with with
-hook called from `restclient-http-send-current-raw', usually
-bound to C-c C-r."
+  "Returns alist of current response headers.
+Works *only* with with hook called from `restclient-http-send-current-raw',
+bound to `\\<restclient-mode-map>\\[restclient-http-send-current-raw]'."
   (let ((start (point-min))
-         (headers-end (+ 1 (string-match "\n\n" (buffer-substring-no-properties (point-min) (point-max))))))
-         (restclient-parse-headers (buffer-substring-no-properties start headers-end))))
+        (headers-end (+ 1 (string-match "\n\n" (buffer-substring-no-properties (point-min) (point-max))))))
+    (restclient-parse-headers (buffer-substring-no-properties start headers-end))))
 
 (defun restclient-set-var-from-header (var header)
+  "Record a dynamic variable VAR from response headers.
+HEADER is the name of the header to look up in the response."
   (restclient-set-var var (cdr (assoc header (restclient-get-response-headers)))))
 
 (defun restclient-read-file (path)
+  "Return the contents of the file PATH as a string."
   (with-temp-buffer
     (insert-file-contents path)
     (buffer-string)))
 
 (defun restclient-replace-path-with-contents (entity)
+  "Include file contents in request.
+ENTITY is the request body, Possibly with `< /file/path' embeded, which
+will be replaced with the contents of `/file/path'."
   (replace-regexp-in-string
    restclient-file-regexp
    (lambda (match)
@@ -591,34 +638,57 @@ bound to C-c C-r."
    entity))
 
 (defun restclient-parse-body (entity vars)
+  "Prepare a request body for sending.
+Replace variables with their values, and include file contents.
+ENTITY is the body of the request (a string), VARS is an alist of currently
+defined variables."
   (restclient-replace-path-with-contents (restclient-replace-all-in-string vars entity)))
 
 (defun restclient-parse-hook (cb-type args-offset args)
+  "Parse a hook definition.
+CB-TYPE is the callback type, must be a previously registered type of handler.
+ARGS-OFFSET is the position in the buffer where the arguments to / contents of
+the hook begin.  ARGS is the string from after the CB-TYPE to the end of the
+line.
+
+Registered callback handlers will typically use only one of ARGS or ARGS-OFFSET."
   (if-let* ((handler (assoc cb-type restclient-result-handlers)))
       (funcall (cadr handler) args args-offset)
     `(lambda ()
        (message "Unknown restclient hook type %s" ,cb-type))))
 
 (defun restclient-register-result-func (name creation-func description)
+  "Register a new callback type.
+NAME: The name of the callback type.
+CREATION-FUNC: A function that interprets the rest of the hook definition and
+returns a function that will be called in the context of the result buffer.
+DESCRIPTION: Descriptive text."
   (let ((new-cell (cons name (cons creation-func description))))
     (setq restclient-result-handlers (cons new-cell restclient-result-handlers))))
 
 (defun restclient-sanitize-var-name (var-name)
+  "Return the name of a variable, without decorations like `:' or `{{}}'.
+VAR-NAME: a variable with or without decorations."
   (save-match-data
     (when (string-match restclient-use-var-regexp var-name)
       (setq var-name (or (match-string 1 var-name) (match-string 2 var-name)))))
   var-name)
 
 (defun restclient-remove-var (var-name)
+  "Remove VAR-NAME from the list of dynamic variables."
   (let ((var-name (restclient-sanitize-var-name var-name)))
     (setq restclient-var-overrides (assoc-delete-all var-name restclient-var-overrides))))
 
 (defun restclient-set-var (var-name value)
+  "Set VAR-NAME to VALUE for any subsequent requests."
   (let ((var-name (restclient-sanitize-var-name var-name)))
     (restclient-remove-var var-name)
     (setq restclient-var-overrides (cons (cons var-name value) restclient-var-overrides))))
 
 (defun restclient-get-var-at-point (var-name buffer-name buffer-pos)
+  "Look up the value of VAR-NAME in the current context.
+Context is defined by environment, dynamically set variables, and variables
+defined in BUFFER-NAME prior to BUFFER-POS."
   (message (format "getting var %s form %s at %s" var-name buffer-name buffer-pos))
   (let* ((var-name (restclient-sanitize-var-name var-name))
          (vars-at-point  (save-excursion
@@ -631,11 +701,13 @@ bound to C-c C-r."
     (restclient-replace-all-in-string vars-at-point (cdr (assoc var-name vars-at-point)))))
 
 (defmacro restclient-get-var (var-name)
+  "Get the value of VAR-NAME in the current buffer."
   (let ((buf-name (buffer-name (current-buffer)))
-		(buf-point (point)))
+	(buf-point (point)))
     `(restclient-get-var-at-point ,var-name ,buf-name ,buf-point)))
 
 (defun restclient-single-request-function ()
+  "Execute the callbacks/hooks defined for the current request."
   (dolist (f restclient-curr-request-functions)
     (save-excursion
       (ignore-errors
@@ -645,6 +717,9 @@ bound to C-c C-r."
 
 
 (defun restclient-http-parse-current-and-do (func &rest args)
+  "Execute FUNC with the current request.
+FUNC will receive the http method, url, headers and body of the request around
+point as arguments, with ARGS included as the final argument."
   (save-excursion
     (goto-char (restclient-current-min))
     (when (re-search-forward restclient-method-url-regexp (point-max) t)
@@ -701,6 +776,10 @@ bound to C-c C-r."
 
 
 (defun restclient-elisp-result-function (args offset)
+  "This is a hook constructor function.
+Read one S-expression starting from OFFSET.
+Return a function of 0 arguments that evaluates that S-expression.
+ARGS is ignored."
   (goto-char offset)
   (let ((form (macroexpand-all (read (current-buffer)))))
     (lambda ()
@@ -717,14 +796,15 @@ bound to C-c C-r."
 (defun restclient-http-send-current (&optional raw stay-in-window suppress-response-buffer)
   "Sends current request.
 Optional argument RAW don't reformat response if t.
-Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
+Optional argument STAY-IN-WINDOW do not move focus to response buffer if t.
+Optional argument SUPPRESS-RESPONSE-BUFFER do not display response buffer if t."
   (interactive)
   (restclient-http-parse-current-and-do 'restclient-http-do raw stay-in-window suppress-response-buffer))
 
 ;;;###autoload
 (defun restclient-http-send-current-raw ()
-  "Sends current request and get raw result
-(no reformatting or syntax highlight of XML, JSON or images)."
+  "Sends current request and get raw result.
+\(no reformatting or syntax highlight of XML, JSON or images)."
   (interactive)
   (restclient-http-send-current t))
 
@@ -777,7 +857,7 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
   (setq deactivate-mark nil))
 
 (defun restclient-show-info ()
-  ;; restclient-info-buffer-name
+  "Display a buffer with information about the current restclient context."
   (interactive)
   (let ((vars-at-point (restclient-find-vars-before-point)))
     (cl-labels ((non-overidden-vars-at-point ()
@@ -838,11 +918,13 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
     (switch-to-buffer-other-window restclient-info-buffer-name)))
 
 (defun restclient-narrow-to-current ()
-  "Narrow to region of current request"
+  "Narrow to region of current request."
   (interactive)
   (narrow-to-region (restclient-current-min) (restclient-current-max)))
 
 (defun restclient-toggle-body-visibility ()
+  "Hide or show the body of the current request.
+Hide/show only happens if point is on the first line of a request."
   (interactive)
   ;; If we are not on the HTTP call line, don't do anything
   (let ((at-header (save-excursion
@@ -865,6 +947,7 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
             (outline-flag-region (point) (restclient-current-max) t)))) t)))
 
 (defun restclient-toggle-body-visibility-or-indent ()
+  "Hide of show the body of the current request, or indent current line."
   (interactive)
   (unless (restclient-toggle-body-visibility)
     (indent-for-tab-command)))
@@ -902,7 +985,7 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
     (define-key map (kbd "C-c C-e") 'restclient-set-env)
     (define-key map (kbd "C-c M-e") 'restclient-reload-current-env)
     map)
-  "Keymap for restclient-mode.")
+  "Keymap for `restclient-mode'.")
 
 (define-minor-mode restclient-outline-mode
   "Minor mode to allow show/hide of request bodies by TAB."

@@ -627,14 +627,6 @@ bound to C-c C-r."
             (vars (restclient-find-vars-before-point))
             (headers '())
 	    (restclient-pre-request-functions nil))
-	(unless (or (string-prefix-p "http://" url)
-		    (string-prefix-p "https://" url))
-	  (if-let (base-uri
-		   (and (string-prefix-p "/" url)
-			(alist-get ":base-uri" vars nil nil #'string=)))
-	      (setq url (concat base-uri url))
-	    (user-error "url MUST start with `/' and `"
-			restclient-base-uri-var "' must be defined")))
         (forward-line)
         (while (cond
 		((looking-at restclient-response-hook-regexp)
@@ -669,6 +661,14 @@ bound to C-c C-r."
                (entity (restclient-parse-body
 			(buffer-substring (min (point) cmax) cmax) vars))
                (url (restclient-replace-all-in-string vars url)))
+	  (unless (or (string-prefix-p "http://" url)
+		      (string-prefix-p "https://" url))
+	    (if-let (base-uri
+		     (and (string-prefix-p "/" url)
+			  (alist-get ":base-uri" vars nil nil #'string=)))
+		(setq url (concat base-uri url))
+	      (user-error "url MUST start with `/' and `"
+			  restclient-base-uri-var "' must be defined")))
 	  (let ((request (make-restclient-request
 			  :method method
 			  :url url

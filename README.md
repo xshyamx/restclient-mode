@@ -343,11 +343,11 @@ your liking. Also, all font lock faces are now customizable in
 
 | Variable Name | Default Value | Description |
 |----|----|----|
-| `restclient-log-request` | `t` | Determines whether restclient logs to the `*Messages*` buffer. If non-nil, restclient requests will be logged. If nil, they will not be. |
-| `restclient-same-buffer-response` | `t` | Re-use same buffer for responses or create a new one each time. If non-nil, re-use the buffer named by `rest-client-buffer-response-name` for all requests. If nil, generate a buffer name based on the request type and url, and increment it for subsequent requests. |
+| restclient-log-request | `t` | Determines whether restclient logs to the `*Messages*` buffer. If non-nil, restclient requests will be logged. If nil, they will not be. |
+| restclient-same-buffer-response | `t` | Re-use same buffer for responses or create a new one each time. If non-nil, re-use the buffer named by `rest-client-buffer-response-name` for all requests. If nil, generate a buffer name based on the request type and url, and increment it for subsequent requests. |
 | restclient-response-buffer-name | `*HTTP Response*` | Name for response buffer to be used when `restclient-same-buffer-response` is true. |
-| `restclient-inhibit-cookies` | `nil` | Inhibit restclient from sending cookies implicitly. |
-| `restclient-response-size-threshold` | 100000 | Size of the response buffer restclient can display without huge performance dropdown.  If response buffer will be more than that, only bare major mode will be used to display it.  Set to `nil` to disable threshold completely. |
+| restclient-inhibit-cookies | `nil` | Inhibit restclient from sending cookies implicitly. |
+| restclient-response-size-threshold | 100000 | Size of the response buffer restclient can display without huge performance dropdown.  If response buffer will be more than that, only bare major mode will be used to display it.  Set to `nil` to disable threshold completely. |
 
 # Known issues
 

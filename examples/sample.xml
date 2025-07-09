@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AAA xmlns="ns"
+     another-attr="x">
+  <name>{{name}}</name>
+  <company>{{company}}</company>
+</AAA>

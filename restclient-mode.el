@@ -196,6 +196,9 @@ other text)."
 (defvar restclient-pre-request-functions nil
   "A list of functions to run before the request is made")
 
+(defvar restclient-post-response-functions nil
+  "A list of functions to run after response is received")
+
 (defvar restclient-response-loaded-hook nil
   "Hook run after response buffer is formatted.")
 
@@ -256,7 +259,8 @@ hanging if two variables reference each other directly or indirectly."
   "Multi-line variable")
 
 (defconst restclient-file-regexp
-  "^<\\(:?\\)[ \t]*\\([^<>\n\r]+\\)[ \t]*$")
+  (rx bol "<" (group (? ":")) (+ space) (group (+ not-newline)) (* space) eol)
+  "Regexp to match payloads from file")
 
 (defconst restclient-content-type-regexp
   "^Content-[Tt]ype: \\(\\w+\\)/\\(?:[^\\+\r\n]*\\+\\)*\\([^;\r\n]+\\)")
@@ -337,7 +341,8 @@ hanging if two variables reference each other directly or indirectly."
                   (append (list method url
 				(if restclient-resuse-response-buffer
                                     restclient-response-buffer-name
-                                  (format "*HTTP %s %s*" method url)))
+                                  (format "*HTTP %s %s*" method url))
+				(buffer-name (current-buffer)))
 			  handle-args)
 		  nil restclient-inhibit-cookies)))
 
@@ -422,6 +427,7 @@ hanging if two variables reference each other directly or indirectly."
           (or (eq (point) (point-min)) (insert "\n"))
 	  (unless restclient-response-body-only
             (let ((hstart (point)))
+	      (setq restclient--header-start-position hstart)
               (insert method " " url "\n" headers)
               (insert (format "Request duration: %fs\n" (float-time (time-subtract restclient-request-time-end restclient-request-time-start))))
               (unless (member guessed-mode '(image-mode text-mode))
@@ -456,6 +462,9 @@ The buffer contains the raw HTTP response sent by the server."
           (restclient-prettify-response method url))
         (buffer-enable-undo)
 	(restclient-response-mode)
+	(message "Complete!")
+	(make-local-variable 'restclient-buffer-name)
+	(setq restclient-buffer-name restclient-buffer)
         (run-hooks 'restclient-response-loaded-hook)
         (unless suppress-response-buffer
           (if stay-in-window
@@ -492,6 +501,7 @@ Content-Type header. If no charset is specified, default to UTF-8."
 		(generate-new-buffer-name target-buffer-name)))))
         (with-current-buffer decoded-http-response-buffer
           (setq buffer-file-coding-system encoding)
+	  (setq restclient--header-start-position (point-min))
           (save-excursion
             (erase-buffer)
             (insert-buffer-substring raw-http-response-buffer))
@@ -531,29 +541,198 @@ Content-Type header. If no charset is specified, default to UTF-8."
       (progn (goto-char (point-max))
              (if (looking-at "^$") (- (point) 1) (point))))))
 
-(defun restclient-replace-all-in-string (replacements string)
-  (if replacements
-      (let ((current string)
-            (pass restclient-vars-max-passes)
-            (continue t))
-        (while (and continue (> pass 0))
-          (setq pass (- pass 1))
-          (setq current
-		(replace-regexp-in-string
-		 (regexp-opt (mapcar 'car replacements))
-                 (lambda (key)
-                   (setq continue t)
-                   (cdr (assoc key replacements)))
-                 current t t)))
-        current)
+(defun restclient-resolve-string (string vars)
+  (if vars
+      (with-temp-buffer
+	(insert string)
+	(let ((pass restclient-vars-max-passes)
+	      (continue t)
+	      (regex (rx-to-string
+		      `(seq "{{"
+			    (group (or ,@(seq-filter #'identity (mapcar #'car vars))))
+			    "}}"))))
+	  (while (and continue (> pass 0))
+            (setq pass (- pass 1))
+	    (goto-char (point-min))
+	    (while (re-search-forward regex nil t)
+	      (let ((var (match-string-no-properties 1)))
+		(setq continue t)
+		(replace-match (alist-get var vars nil nil #'string=) t t)))))
+	(buffer-string))
     string))
 
-(defun restclient-replace-all-in-header (replacements header)
+(defun restclient-replace-all-in-header (header replacements)
   (cons (car header)
-        (restclient-replace-all-in-string replacements (cdr header))))
+	(restclient-resolve-string (cdr header) replacements)))
 
 (defun restclient-chop (text)
   (if text (replace-regexp-in-string "\n$" "" text) nil))
+
+
+(defun restclient--find-dependencies (string)
+  "Find the dependent variables used in the string ie. anything enclosed in
+`{{' `}}'.
+
+Variables names follow the following rules
+
+1. Must start with an alphabet or underscore
+2. Can contain alphanumeric characters, underscores or hyphens"
+  (let ((deps))
+    (with-temp-buffer
+      (insert string)
+      (goto-char (point-min))
+      (while (re-search-forward
+	      (rx "{{" (group
+			(or alpha "_")
+			(*? (or alnum "-" "_")))
+		  "}}")
+	      nil t)
+	(push (match-string-no-properties 1) deps)))
+    (seq-uniq deps #'string=)))
+
+(defun restclient-find-vars-in-region (begin end)
+  "Find all variables defined in region and return a list of variables
+where each variable is of the form
+
+(name value evaluated dependent-variables)"
+  (let ((vars))
+    (save-excursion
+      (goto-char begin)
+      (while (re-search-forward
+	      (rx bol
+		  ;; variable name
+		  "@"
+		  (group
+		   (or alpha "_")
+		   (*? (or alnum "-" "_")))
+		  (* space)
+		  ;; assignment
+		  (group (? ":") "=")
+		  (* space)
+		  ;; multi-line
+		  (group (or "<<" (* not-newline)))
+		  eol)
+	      end t)
+	(let ((name (match-string-no-properties 1))
+	      (assignment (match-string-no-properties 2))
+	      (should-eval (string= ":=" (match-string-no-properties 2)))
+	      (candidate (match-string-no-properties 3))
+	      (value-begin (match-beginning 3))
+	      (value))
+	  (setq value
+		(cond
+		 ((string= "<<" candidate)
+		  (forward-line)
+		  (setq value-begin (line-beginning-position))
+		  (re-search-forward (rx bol "#" eol) )
+		  (forward-line -1)
+		  (buffer-substring-no-properties
+		   value-begin
+		   (line-end-position)))
+		 ((and (not (string= "<<" candidate))
+		       (string= ":=" assignment))
+		  (goto-char value-begin)
+		  (forward-sexp)
+		  (buffer-substring-no-properties
+		   value-begin
+		   (point)))
+		 (t candidate)))
+	  (push (list name value should-eval
+		      (restclient--find-dependencies value))
+		vars))))
+    ;; return in order of priority overrides, variables, environment
+    (append restclient-var-overrides
+	    (restclient-resolve-variables vars (append restclient-var-overrides
+						       restclient-current-env))
+	    restclient-current-env)))
+
+(defun restclient--unresolved-variables (pending resolved)
+  "Return a list unresolved variables in PENDING list by removing variables
+that are present in the RESOLVED list"
+  (seq-filter
+   (lambda (v) (not (assoc-string (car v) resolved)))
+   pending))
+
+(defun restclient--resolvable-variables (pending resolved)
+  "Return the list of variables from PENDING list whose dependences are all
+found in the RESOLVED list"
+  (seq-filter
+   (lambda (v) (let ((deps (nth 3 v)))
+	    ;; all dependencies are available in resolved list of variables
+	    (eq
+	     (length deps)
+	     (length (remove nil
+			     (mapcar
+			      (lambda (dep) (assoc-string dep resolved))
+			      deps))))))
+   pending))
+
+(defun restclient-resolve-variables (vars extra-vars)
+  "Resolve the variables defined in the buffer VARS with values from
+EXTRA-VARS which is composed of `restclient-var-overrides' &
+`restclient-current-env'"
+  (let* ((var-names (mapcar #'car (append vars extra-vars)))
+	 (resolved (append
+		    (mapcar
+		     (lambda (v) (cons (car v)
+				  (let ((val (cadr v)))
+				    (if (nth 2 v)
+					(restclient-eval-var val)
+				      val))))
+		     (seq-filter    ; filter vars with no dependencies
+		      (lambda (v) (= (length (nth 3 v)) 0)) vars))
+		    extra-vars))
+	 (missing (mapcar
+		   #'car
+		   (seq-filter
+		    (lambda (v)
+		      (> (length (seq-difference (nth 3 v)
+						 var-names))
+			 0))
+		    vars)))
+	 (circular-deps (mapcar
+			 #'car
+			 (seq-filter
+			  (lambda (v) (member (car v) (nth 3 v)))
+			  vars)))
+	 (pending (seq-filter
+		   (lambda (v) (and (> (length (nth 3 v)) 0)
+			       (not (member (car v) circular-deps))
+			       (not (member (car v) missing))))
+		   vars))
+	 (resolvable))
+    (when (or missing
+	      circular-deps)
+      (message (concat "Skipping %s with missing variables "
+		       "& %s with circular dependencies")
+	       missing circular-deps))
+    ;; calculate resolvable
+    (setq resolvable (restclient--resolvable-variables pending resolved))
+    ;; If there are resolved variables then we can resolve the pending
+    ;; & resolvable
+    (while (and
+	    (> (length resolved) 0)
+	    (or
+	     (> (length pending) 0)
+	     (> (length resolvable) 0)))
+      ;; resolve the resolvables
+      (dolist (var resolvable)
+	(push
+	 (cons (car var)
+	       ;; evaluate var if resolved
+	       (let ((val (restclient-resolve-string (nth 1 var) resolved)))
+		 (if (nth 2 var)
+		     (restclient-eval-var val)
+		   val)))
+	 resolved))
+
+      (setq
+       ;; calculate the new pending list by removing resolved variables
+       ;; from the pending list
+       pending (restclient--unresolved-variables pending resolved)
+       ;; calculate the resolvable variables as before
+       resolvable (restclient--resolvable-variables pending resolved)))
+    resolved))
 
 (defun restclient-find-vars-before-point ()
   (let ((vars nil)
@@ -590,20 +769,36 @@ Content-Type header. If no charset is specified, default to UTF-8."
     headers))
 
 (defun restclient-get-response-headers ()
-  "Returns alist of current response headers. Works *only* with with
-hook called from `restclient-http-send-current-raw', usually
-bound to C-c C-r."
-  (let ((start (point-min))
-        (headers-end
-	 (1+ (string-match
-	      "\n\n"
-	      (buffer-substring-no-properties (point-min) (point-max))))))
-    (restclient-parse-headers
-     (buffer-substring-no-properties start headers-end))))
+  "Returns alist of current response headers"
+  (let* ((start restclient--header-start-position)
+	 (headers-end
+	  (1+ (or (string-match
+		   "\n\n"
+		   (buffer-substring-no-properties start (point-max)))
+		  (buffer-size))))
+	 (headers-commented-p (and (< 1 start) ;; catches raw response buffers
+				   (not (member major-mode '(image-mode text-mode)))))
+	 (headers-string (buffer-substring-no-properties start headers-end)))
+    (when headers-commented-p
+      ;; Temporarily uncomment to extract string
+      (uncomment-region start headers-end)
+      (setq headers-end (1+ (or (string-match
+				 "\n\n"
+				 (buffer-substring-no-properties start (point-max)))
+				(buffer-size)))
+	    headers-string (buffer-substring-no-properties start headers-end))
+      (comment-region start headers-end))
+    (restclient-parse-headers headers-string)))
+
 
 (defun restclient-set-var-from-header (var header)
-  (restclient-set-var
-   var (cdr (assoc header (restclient-get-response-headers)))))
+  (let* ((headers (restclient-get-response-headers))
+	 (val (restclient--get-var headers header)))
+    (when (local-variable-if-set-p 'restclient-buffer-name)
+      (with-current-buffer restclient-buffer-name
+	(when (and (stringp val)
+		   (> (length val) 0))
+	  (restclient-set-var var val))))))
 
 (defun restclient-read-file (path)
   (with-temp-buffer
@@ -611,12 +806,18 @@ bound to C-c C-r."
     (buffer-string)))
 
 (defun restclient-parse-body (entity vars)
-  (if (= 0 (or (string-match restclient-file-regexp entity) 1))
-      (if (string= ":" (match-string 1 entity))
-	  (restclient-replace-all-in-string
-	   vars (restclient-read-file (match-string 2 entity)))
-	(restclient-read-file (match-string 2 entity)))
-    (restclient-replace-all-in-string vars entity)))
+  (if (string-match restclient-file-regexp entity)
+      (let ((resolve-payload (string= ":" (match-string 1 entity)))
+	    (filename (restclient-resolve-string
+		       (match-string 2 entity)
+		       vars)))
+	(if-let ((contents (and (file-exists-p filename)
+				(restclient-read-file filename))))
+	    (if resolve-payload
+		(restclient-resolve-string contents vars)
+	      contents)
+	  (user-error "File not found: %s" filename)))
+    (restclient-resolve-string entity vars)))
 
 (defun restclient-parse-hook (cb-type args-offset args)
   (if-let ((handler (assoc cb-type restclient-result-handlers)))
@@ -652,7 +853,7 @@ bound to C-c C-r."
 	    (re-search-backward "^:\\|->" (point-min) t)
 	    (restclient-find-vars-before-point))))
     (if-let (value (cdr (assoc var-name vars-at-point)))
-	(restclient-replace-all-in-string vars-at-point value)
+	(restclient-resolve-string value vars-at-point)
       nil)))
 
 (defmacro restclient-get-var (var-name)
@@ -677,7 +878,7 @@ bound to C-c C-r."
     (when (re-search-forward restclient-method-url-regexp (point-max) t)
       (let ((method (match-string-no-properties 1))
             (url (string-trim (match-string-no-properties 2)))
-            (vars (restclient-find-vars-before-point))
+            (vars (restclient-find-vars-in-region (point-min) (point)))
             (headers '())
 	    (restclient-pre-request-functions nil))
         (forward-line)
@@ -688,22 +889,25 @@ bound to C-c C-r."
 			     (match-string-no-properties 2)
 			     (match-end 2)
 			     (match-string-no-properties 3)))
-		   (if (string= "pre-request" (match-string-no-properties 2))
-		       (push hook-function restclient-pre-request-functions)
-		     (push hook-function restclient-curr-request-functions))))
+		   (cond
+		    ((string= "pre-request" (match-string-no-properties 2))
+		     (push hook-function restclient-pre-request-functions))
+		    ((string= "post-response" (match-string-no-properties 2))
+		     (push hook-function restclient-post-response-functions))
+		    (t (push hook-function restclient-curr-request-functions)))))
                 ((and (looking-at restclient-header-regexp)
 		      (not (looking-at restclient-empty-line-regexp)))
                  (setq headers
 		       (cons
 			(restclient-replace-all-in-header
-			 vars (restclient-make-header))
+			 (restclient-make-header) vars)
 			headers)))
                 ((looking-at restclient-header-var-regexp)
                  (setq headers
 		       (append headers
 			       (restclient-parse-headers
-				(restclient-replace-all-in-string
-				 vars (match-string 1)))))))
+				(restclient-resolve-string
+				 (match-string 1) vars ))))))
           (forward-line))
         (when (looking-at restclient-empty-line-regexp)
           (forward-line))
@@ -713,7 +917,7 @@ bound to C-c C-r."
         (let* ((cmax (restclient-current-max))
                (entity (restclient-parse-body
 			(buffer-substring (min (point) cmax) cmax) vars))
-               (url (restclient-replace-all-in-string vars url)))
+               (url (restclient-resolve-string url vars)))
 	  (unless (or (string-prefix-p "http://" url)
 		      (string-prefix-p "https://" url))
 	    (if-let (base-uri
@@ -765,11 +969,22 @@ clipboard."
       (message "curl command copied to clipboard."))))
 
 
+(defun restclient--elisp-helpers (buffer)
+  `(progn (defun set-var (name value)
+	    (message "Setting %s" name)
+	    (with-current-buffer ,buffer
+	      (restclient-set-var name value)))
+	  (defun get-var (name)
+	    (with-current-buffer ,buffer
+	      (restclient-get-var name)))))
+
 (defun restclient-elisp-result-function (args offset)
   (goto-char offset)
   (let ((form (macroexpand-all (read (current-buffer)))))
     (lambda ()
-      (eval form))))
+      (eval (progn
+	      (restclient--elisp-helpers (buffer-name (current-buffer)))
+	      form)))))
 
 (defun restclient--select-method (table prompt &optional format)
   (let (allowed-keys rtn pressed formatter buffer (inhibit-quit t))
@@ -850,7 +1065,6 @@ clipboard."
  "Call the provided (possibly multi-line) elisp before the request is sent")
 
 (defun restclient-elisp-request-function (args offset)
-  (message "restclient-elisp-request-function: %s %s" args offset)
   (goto-char offset)
   `(lambda (request)
      (if (restclient-request-p request)
@@ -1030,7 +1244,7 @@ conventions"
 	    "\n" "|\n| |"
 	    (replace-regexp-in-string
 	     "\|" "\\\\vert{}"
-	     (restclient-replace-all-in-string vars-at-point var-value))))
+	     (restclient-resolve-string  var-value vars-at-point))))
 	 (var-row (var-name var-value)
 	   (insert "|" var-name "|" (sanitize-value-cell var-value) "|\n"))
 	 (var-table (table-name)
@@ -1075,7 +1289,8 @@ conventions"
 (defun restclient-narrow-to-current ()
   "Narrow to region of current request"
   (interactive)
-  (narrow-to-region (restclient-current-min) (restclient-current-max)))
+  (when-let (region (restclient-request-bounds))
+    (narrow-to-region (car region) (cadr region))))
 
 (defun restclient-toggle-body-visibility ()
   (interactive)
@@ -1173,7 +1388,7 @@ conventions"
   (setq-local comment-column 48)
   (setq-local imenu-generic-expression
 	      (list
-	       (list nil restclient-method-url-regexp 2)))
+	       (list nil restclient-method-url-regexp 0)))
   (setq-local font-lock-defaults '(restclient-mode-keywords))
   (setq-local mode-name '(:eval (restclient--mode-name)))
   ;; We use outline-mode's method outline-flag-region to hide/show the

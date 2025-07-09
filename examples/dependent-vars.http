@@ -1,0 +1,21 @@
+# -*- mode: restclient -*-
+# set basic auth from vars & referencing vars in hooks
+@non-existent = This is not {{there}}
+@headers = <<
+Content-Type: application/json
+Authorization: {{auth-token}}
+#
+@circular = <<
+{{user}} and jill went up the hill
+to fetch a pail of water
+{{user}} ran in a {{circular}} fashion
+#
+@user = jack
+@password = secret
+@test-me := (format "%s:%s" "{{user}}" "{{password}}")
+@auth-token :=  (format "Basic %s" (base64-encode-string "{{test-me}}"))
+GET /basic-auth/jack/secret
+{{headers}}
+
+-> run-hook (message (format "authenticated with '%s'" (restclient-get-var "auth-token")))
+###

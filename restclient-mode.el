@@ -83,6 +83,11 @@
   :group 'restclient
   :type 'boolean)
 
+(defcustom restclient-default-env-file "env.json"
+  "Default environment file name to look for"
+  :group 'restclient
+  :type 'string)
+
 (defgroup restclient-faces nil
   "Faces used in Restclient Mode"
   :group 'restclient
@@ -161,9 +166,25 @@ other text)."
 (defvar restclient-request-time-start nil)
 (defvar restclient-request-time-end nil)
 
-(defvar restclient-var-overrides nil
+;; buffer-local variables
+(defvar-local restclient-var-overrides nil
   "An alist of vars that will override any set in the file,
   also where dynamic vars set on callbacks are stored.")
+
+(defvar-local restclient-env-file nil
+  "File to load environments for current restclient buffer")
+
+(defvar-local restclient-envs nil
+  "Environments loaded from current `restclient-env-file'")
+
+(defvar-local restclient-current-env-name nil
+  "Current selected environment")
+
+(defvar-local restclient-current-env nil
+  "Current applied environment based on `restclient-current-env-name'")
+
+(defvar-local restclient--header-start-position nil
+  "Position in the response buffer where headers start")
 
 (defvar restclient-result-handlers '()
   "A registry of available completion hooks.
@@ -197,28 +218,41 @@ hanging if two variables reference each other directly or indirectly."
   (concat "^[^" restclient-comment-separator "]"))
 (defconst restclient-empty-line-regexp "^\\s-*$")
 
+(defconst restclient-http-methods
+  '("GET" "POST" "PUT" "DELETE" "HEAD" "OPTIONS" "PATCH")
+  "Support HTTP methods")
+
+(defconst restclient-var-prefix "@"
+  "Prefix character to used to define variables")
+
 (defconst restclient-method-url-regexp
-  "^\\(GET\\|POST\\|DELETE\\|PUT\\|HEAD\\|OPTIONS\\|PATCH\\) \\(.*\\)$")
+  (rx-to-string `(: bol
+		    (group (or ,@restclient-http-methods))
+		    (+ space)
+		    (group (* any))
+		    eol)
+		t)
+  "Regexp to match request line")
 
 (defconst restclient-header-regexp
   "^\\([^](),/:;@[\\{}= \t<]+\\): \\(.*\\)$")
 
-(defconst restclient-use-var-regexp
-  "^\\(:[^: \n]+\\)$")
+(defconst restclient-header-var-regexp
+  (rx bol (group "{{" (+ (not (or "}" space "\n"))) "}}") eol))
 
 (defconst restclient-var-regexp
-  (concat "^\\(:[^:= ]+\\)[ \t]*\\(:?\\)=[ \t]*\\(<<[ \t]*\n\\(\\(.*\n\\)*?\\)" restclient-comment-separator "\\|\\([^<].*\\)$\\)"))
+  (concat "^\\(?:" restclient-var-prefix "\\([^:= ]+\\)\\)[ \t]*\\(:?\\)=[ \t]*\\(<<[ \t]*\n\\(\\(.*\n\\)*?\\)" restclient-comment-separator "\\|\\([^<].*\\)$\\)"))
 
 (defconst restclient-svar-regexp
-  "^\\(:[^:= ]+\\)[ \t]*=[ \t]*\\(.+?\\)$"
+  (concat "^\\(" restclient-var-prefix "[^:= ]+\\)[ \t]*=[ \t]*\\(.+?\\)$")
   "String variable")
 
 (defconst restclient-evar-regexp
-  "^\\(:[^: ]+\\)[ \t]*:=[ \t]*\\(.+?\\)$"
+  (concat "^\\(" restclient-var-prefix "[^: ]+\\)[ \t]*:=[ \t]*\\(.+?\\)$")
   "Elisp variable")
 
 (defconst restclient-mvar-regexp
-  "^\\(:[^: ]+\\)[ \t]*:?=[ \t]*\\(<<\\)[ \t]*$"
+  (concat "^\\(" restclient-var-prefix "[^: ]+\\)[ \t]*:?=[ \t]*\\(<<\\)[ \t]*$")
   "Multi-line variable")
 
 (defconst restclient-file-regexp
@@ -231,9 +265,16 @@ hanging if two variables reference each other directly or indirectly."
   "^\\(->\\) \\([^[:space:]]+\\) +\\(.*\\)$")
 
 (defconst restclient-base-uri-var
-  ":base-uri"
+  "base-uri"
   "Name of the base uri variable to in relative urls")
 
+(defconst restclient-shared-env-name
+  "$shared"
+  "Name of the key which has variables shared across all environments")
+
+(defconst restclient-default-mode-name
+  "REST Client"
+  "Default mode name to display in modeline")
 ;; The following disables the interactive request for user name and
 ;; password should an API call encounter a permission-denied response.
 ;; This API is meant to be usable without constant asking for username
@@ -396,7 +437,8 @@ hanging if two variables reference each other directly or indirectly."
        t nil))))
 
 (defun restclient-http-handle-response
-    (status method url bufname raw stay-in-window suppress-response-buffer)
+    (status method url bufname restclient-buffer
+	    raw stay-in-window suppress-response-buffer)
   "Switch to the buffer returned by `url-retreive'.
 The buffer contains the raw HTTP response sent by the server."
   (setq restclient-within-call nil)
@@ -462,17 +504,24 @@ Content-Type header. If no charset is specified, default to UTF-8."
               (symbol-name encoding))))
           decoded-http-response-buffer)))))
 
+(defun restclient-request-bounds ()
+  (save-excursion
+    (beginning-of-line)
+    (let ((begin) (end))
+      (setq begin
+	    (if (looking-at restclient-method-url-regexp t)
+		(point)
+	      (re-search-backward restclient-method-url-regexp nil t)))
+      (setq end (re-search-forward (rx bol (repeat 3 "#") eol)))
+      (when (and begin end)
+	(list begin end)))))
+
 (defun restclient-current-min ()
   (save-excursion
     (beginning-of-line)
-    (if (looking-at restclient-comment-start-regexp)
-        (if (re-search-forward
-	     restclient-comment-not-regexp (point-max) t)
-            (point-at-bol) (point-max))
-      (if (re-search-backward
-	   restclient-comment-start-regexp (point-min) t)
-          (point-at-bol 2)
-        (point-min)))))
+    (if (looking-at restclient-method-url-regexp t)
+	(point)
+      (re-search-backward restclient-method-url-regexp nil t))))
 
 (defun restclient-current-max ()
   (save-excursion
@@ -523,7 +572,7 @@ Content-Type header. If no charset is specified, default to UTF-8."
 		       (if should-eval
 			   (restclient-eval-var value) value))
 		 vars))))
-      (append restclient-var-overrides vars))))
+      (append restclient-var-overrides vars restclient-current-env))))
 
 (defun restclient-eval-var (string)
   (with-output-to-string (princ (eval (read string)))))
@@ -581,7 +630,9 @@ bound to C-c C-r."
 	  (cons new-cell restclient-result-handlers))))
 
 (defun restclient-remove-var (var-name)
-  (setq restclient-var-overrides (assoc-delete-all var-name restclient-var-overrides)))
+  (setq
+   restclient-var-overrides
+   (assoc-delete-all var-name restclient-var-overrides)))
 
 (defun restclient-set-var (var-name value)
   (restclient-remove-var var-name)
@@ -590,7 +641,6 @@ bound to C-c C-r."
 	      restclient-var-overrides)))
 
 (defun restclient-get-var-at-point (var-name buffer-name buffer-pos)
-  (message (format "getting var %s form %s at %s" var-name buffer-name buffer-pos))
   (let* ((vars-at-point
 	  (save-excursion
 	    (switch-to-buffer buffer-name)
@@ -609,6 +659,9 @@ bound to C-c C-r."
   (let ((buf-name (buffer-name (current-buffer)))
 	(buf-point (point)))
     `(restclient-get-var-at-point ,var-name ,buf-name ,buf-point)))
+
+(defun restclient--get-var (vars name &optional default)
+  (alist-get name vars (or default nil) nil #'string=))
 
 (defun restclient-single-request-function ()
   (dolist (f restclient-curr-request-functions)
@@ -645,7 +698,7 @@ bound to C-c C-r."
 			(restclient-replace-all-in-header
 			 vars (restclient-make-header))
 			headers)))
-                ((looking-at restclient-use-var-regexp)
+                ((looking-at restclient-header-var-regexp)
                  (setq headers
 		       (append headers
 			       (restclient-parse-headers
@@ -665,10 +718,14 @@ bound to C-c C-r."
 		      (string-prefix-p "https://" url))
 	    (if-let (base-uri
 		     (and (string-prefix-p "/" url)
-			  (alist-get ":base-uri" vars nil nil #'string=)))
+			  (restclient--get-var vars restclient-base-uri-var)))
 		(setq url (concat base-uri url))
-	      (user-error "url MUST start with `/' and `"
-			  restclient-base-uri-var "' must be defined")))
+	      (user-error (concat
+			   "url MUST start with `/' and"
+			   " `%s' must be defined "
+			   "(url: %s, base-uri: %s)")
+			  restclient-base-uri-var
+			  url (alist-get restclient-base-uri-var nil nil #'string=))))
 	  (let ((request (make-restclient-request
 			  :method method
 			  :url url
@@ -686,15 +743,16 @@ bound to C-c C-r."
 		   args)))))))
 
 (defun restclient-copy-curl-command ()
-  "Formats the request as a curl command and copies the command to the clipboard."
+  "Formats the request as a curl command and copies the command to the
+clipboard."
   (interactive)
   (restclient-http-parse-current-and-do
    '(lambda (method url headers entity)
       (let ((header-args
-             (apply 'append
-                    (mapcar (lambda (header)
-                              (list "-H" (format "%s: %s" (car header) (cdr header))))
-                            headers))))
+	     (apply 'append
+		    (mapcar (lambda (header)
+			      (list "-H" (format "%s: %s" (car header) (cdr header))))
+			    headers))))
         (kill-new (concat "curl "
                           (mapconcat 'shell-quote-argument
                                      (append '("-i")
@@ -771,10 +829,13 @@ bound to C-c C-r."
 		 ("u" . "PUT")
 		 ("h" . "HEAD")
 		 ("o" . "OPTIONS")
-		 ("t" . "PATCH"))))
+		 ("t" . "PATCH")))
+	(p))
     (when-let (selected (restclient--select-method table "Select method: "))
-      (insert "### " (cdr selected) "\n"
-	      (cdr selected) " "))))
+      (insert (cdr selected) " /")
+      (setq p (point))
+      (insert "\n###\n")
+      (goto-char p))))
 
 
 (restclient-register-result-func
@@ -797,7 +858,8 @@ bound to C-c C-r."
        request)))
 
 ;;;###autoload
-(defun restclient-http-send-current (&optional raw stay-in-window suppress-response-buffer)
+(defun restclient-http-send-current
+    (&optional raw stay-in-window suppress-response-buffer)
   "Sends current request.
 Optional argument RAW don't reformat response if t.
 Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
@@ -822,32 +884,27 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
   (interactive)
   (restclient-http-send-current nil nil t))
 
+(defun restclient-find-next-request (&optional backward)
+  (save-excursion
+    (beginning-of-line)
+    (when (looking-at restclient-method-url-regexp t)
+      (forward-line (if backward -1 1)))
+    (if (if backward
+	    (re-search-backward restclient-method-url-regexp nil t)
+	  (re-search-forward restclient-method-url-regexp nil t))
+	(line-beginning-position)
+      nil)))
 (defun restclient-jump-next ()
   "Jump to next request in buffer."
   (interactive)
-  (let ((last-min nil))
-    (while (not (eq last-min (goto-char (restclient-current-min))))
-      (goto-char (restclient-current-min))
-      (setq last-min (point))))
-  (goto-char (+ (restclient-current-max) 1))
-  (goto-char (restclient-current-min)))
+  (when-let (pos (restclient-find-next-request))
+    (goto-char pos)))
 
 (defun restclient-jump-prev ()
   "Jump to previous request in buffer."
   (interactive)
-  (let* ((current-min (restclient-current-min))
-         (end-of-entity
-          (save-excursion
-            (progn (goto-char (restclient-current-min))
-                   (while (and (or (looking-at "^\s*\\(#.*\\)?$")
-                                   (eq (point) current-min))
-                               (not (eq (point) (point-min))))
-                     (forward-line -1)
-                     (beginning-of-line))
-                   (point)))))
-    (unless (eq (point-min) end-of-entity)
-      (goto-char end-of-entity)
-      (goto-char (restclient-current-min)))))
+  (when-let (pos (restclient-find-next-request -1))
+    (goto-char pos)))
 
 (defun restclient-mark-current ()
   "Mark current request."
@@ -857,6 +914,107 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
   (goto-char (restclient-current-max))
   (backward-char 1)
   (setq deactivate-mark nil))
+
+(defun restclient--mode-name ()
+  (if (> (length restclient-current-env-name) 0)
+      (concat "REST env["
+	      (propertize restclient-current-env-name 'face 'mode-line-highlight)
+	      "]")
+    restclient-default-mode-name))
+
+(defun restclient-set-env (&optional reload-env force-env force-file)
+  "Set the current environment based on the `restclient-env-file' and
+prompt user for `restclient-current-env-name'"
+  (interactive)
+  ;; get environment file name
+  (when (or force-file
+	    (not (buffer-local-value
+		  'restclient-env-file (current-buffer))))
+    (let ((file (read-file-name
+		 "Environment file name: "
+		 nil
+		 (when (buffer-file-name)
+		   (file-name-directory (buffer-file-name))))))
+      (if (and
+	   (file-exists-p file)
+	   (not (file-directory-p file)))
+	  (setq-local restclient-env-file (expand-file-name file))
+	(user-error "Failed to find environment file: %s" file))))
+
+  ;; load environment file
+  (unless (file-exists-p restclient-env-file)
+    (user-error "Failed to find environment file: %s"
+		restclient-env-file))
+  (when (or reload-env
+	    (not restclient-envs))
+    (setq-local restclient-envs
+		(restclient-load-env-file restclient-env-file)))
+
+  ;; select environment
+  (let ((en (restclient--get-env-names restclient-envs)))
+    (cond
+     ((eq (length en) 1)
+      (setq-local
+       restclient-current-env-name (car en)))
+     ((> (length en) 0)
+      (setq-local
+       restclient-current-env-name
+       (completing-read "Select environment" en nil t)))
+     (t (user-error "No valid environments found"))))
+  (message "restclient-current-env-name: %s" restclient-current-env-name)
+  (when restclient-current-env-name
+    (message "Loading environment %s ..." restclient-current-env-name)
+    ;; set current environment
+    (setq-local
+     restclient-current-env
+     (append nil
+	     (alist-get restclient-current-env-name
+			restclient-envs nil nil #'string=)
+	     (alist-get restclient-shared-env-name
+			restclient-envs nil nil #'string=)))))
+
+(defun restclient--get-env-names (envs)
+  "Return a list of environments names excluding the
+`restclient-shared-env-name'"
+  (seq-filter
+   (lambda (n) (not (string= restclient-shared-env-name n)))
+   (mapcar #'car envs)))
+
+(defun restclient--stringify-env (env)
+  "Return ENV where all the values are stringified according to JSON
+conventions"
+  (let ((name (car env))
+	(values (cdr env)))
+    (cons name
+	  (mapcar
+	   (lambda (kv) (cons (car kv)
+			 (let ((val (cdr kv)))
+			   (if (stringp val)
+			       val
+			     (json-encode val)))))
+	   values))))
+
+(defun restclient-load-env-file (file)
+  "Read environments from FILE"
+  (interactive "fEnvironment File")
+  (when (file-exists-p file)
+    (message "Loading environments from %s ..." (file-name-nondirectory file))
+    (condition-case nil
+	(let ((json-key-type 'string))
+	  (when-let ((envs (json-read-file file)))
+	    (setq-local restclient-env-file
+			file
+			restclient-envs
+			(mapcar #'restclient--stringify-env envs))))
+      (error (message "Failed loading environment file %s" (file-name-nondirectory file))))))
+
+(defun resclient-reload-current-env ()
+  (interactive)
+  (restclient-set-env t))
+
+(defun restclient-change-env ()
+  (interactive)
+  (restclient-set-env nil t nil))
 
 (defun restclient-show-info ()
   ;; restclient-info-buffer-name
@@ -951,7 +1109,7 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
         (list restclient-svar-regexp '(1 'restclient-variable-name-face) '(2 'restclient-variable-string-face))
         (list restclient-evar-regexp '(1 'restclient-variable-name-face) '(2 'restclient-variable-elisp-face t))
         (list restclient-mvar-regexp '(1 'restclient-variable-name-face) '(2 'restclient-variable-multiline-face t))
-        (list restclient-use-var-regexp '(1 'restclient-variable-usage-face))
+        (list restclient-header-var-regexp '(1 'restclient-variable-usage-face))
         (list restclient-file-regexp '(0 'restclient-file-upload-face))
         (list restclient-header-regexp '(1 'restclient-header-name-face t) '(2 'restclient-header-value-face t))
 	(list restclient-response-hook-regexp '(1 ' restclient-request-hook-face t)
@@ -963,6 +1121,14 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
     (modify-syntax-entry ?\# "<" table)
     (modify-syntax-entry ?\n ">#" table)
     table))
+
+(defvar restclient-env-mode-map
+  (let ((map (make-sparse-keymap)))
+    (keymap-set map "l" #'restclient-load-env-file)
+    (keymap-set map "r" #'resclient-reload-current-env)
+    (keymap-set map "c" #'restclient-change-env)
+    map)
+  "Keymap for restclient environment")
 
 (defvar restclient-mode-map
   (let ((map (make-sparse-keymap)))
@@ -977,6 +1143,7 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
     (keymap-set map "C-c n n" #'restclient-narrow-to-current)
     (keymap-set map "C-c C-i" #'restclient-show-info)
     (keymap-set map "C-c i" #'restclient-insert-request)
+    (keymap-set map "C-c e" restclient-env-mode-map)
     map)
   "Keymap for restclient-mode.")
 
@@ -998,7 +1165,8 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
   :group 'restclient)
 
 ;;;###autoload
-(define-derived-mode restclient-mode fundamental-mode "REST Client"
+(define-derived-mode restclient-mode fundamental-mode
+  restclient-default-mode-name
   "Turn on restclient mode."
   (setq-local comment-start "# ")
   (setq-local comment-start-skip "# *")
@@ -1007,6 +1175,7 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
 	      (list
 	       (list nil restclient-method-url-regexp 2)))
   (setq-local font-lock-defaults '(restclient-mode-keywords))
+  (setq-local mode-name '(:eval (restclient--mode-name)))
   ;; We use outline-mode's method outline-flag-region to hide/show the
   ;; body. As a part of it, it sets 'invisibility text property to
   ;; 'outline. To get ellipsis, we need 'outline to be in

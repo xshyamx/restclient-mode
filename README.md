@@ -106,7 +106,7 @@ DELETE /2/version/20
 
 # Set a variable to the value of your ip address using a jq expression
 GET http://httpbin.org/ip
--> jq-set-var :my-ip .origin
+-> jq-set-var my-ip .origin
 ###
 ```
 

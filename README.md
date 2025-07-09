@@ -4,8 +4,13 @@
 > The original http://github.com/pashky/restclient.el was archived on Apri 17, 2024. This is my personal fork with just the changes that I need for my workflow
 
 This is a tool to manually explore and test HTTP REST webservices.
-Runs queries from a plain-text query sheet,
-displays results as a pretty-printed XML, JSON and even images.
+Runs queries from a plain-text query sheet, displays results as a
+pretty-printed XML, JSON and even images.
+
+The format of the restclient mode buffer takes inspiration from
+
+- [IntelliJ: HTTP request syntax﻿](https://www.jetbrains.com/help/idea/exploring-http-syntax.html)
+- [Visual Studio 2022: .http files syntax](https://learn.microsoft.com/en-us/aspnet/core/test/http-files?view=aspnetcore-9.0#http-file-syntax)
 
 # Usage
 
@@ -52,27 +57,32 @@ Query file example:
 #
 GET https://api.github.com
 User-Agent: Emacs Restclient
+###
 
 #
 # XML is supported - highlight, pretty-print
 #
 GET http://www.redmine.org/issues.xml?limit=10
+###
 
 #
 # It can even show an image!
 #
 GET http://upload.wikimedia.org/wikipedia/commons/6/63/Wikipedia-logo.png
+###
 #
 # A bit of json GET, you can pass headers too
 #
-GET http://jira.atlassian.com/rest/api/latest/issue/JRA-9
+@base-uri = http://jira.atlassian.com/rest/api
+# use relative URIs by defining a `base-uri` variable
+GET /latest/issue/JRA-9
 User-Agent: Emacs24
 Accept-Encoding: compress, gzip
-
+###
 #
 # Post works too, entity just goes after an empty line. Same is for PUT.
 #
-POST https://jira.atlassian.com/rest/api/2/search
+POST /2/search
 Content-Type: application/json
 
 {
@@ -85,55 +95,66 @@ Content-Type: application/json
                 "assignee"
         ]
 }
+###
 #
 # And delete, will return not-found error...
 #
-DELETE https://jira.atlassian.com/rest/api/2/version/20
+DELETE /2/version/20
+###
 
 # Set a variable to the value of your ip address using a jq expression
 GET http://httpbin.org/ip
 -> jq-set-var :my-ip .origin
+###
 ```
 
-Lines starting with `#` are considered comments AND also act as separators.
+Lines starting with `#` are considered comments. Each request begins with the method and URI and ends with `###`
 
 HTTPS and image display requires additional dll's on windows (libtls, libpng, libjpeg etc), which are not in the emacs distribution.
 
 More examples can be found in the `examples` directory.
 
-Requests can use relative path provided that the `:base-uri` variable is defined in the buffer.
+Declare variables within the buffer anywhere outside of a request by starting the line with `@`. For eg.
 
 ```
-:base-uri = http://httpbin.org
-# get json
+@base-uri = https://httpbing.org
+```
+
+Requests can use relative path provided that the `base-uri` variable is defined in the buffer.
+
+```
+@base-uri = http://httpbin.org
 GET /json
 ```
 
-In the above example the request will be sent to `http://httbin.org/json`. Any request using the relative uri will use the same `:base-uri` to override use the full url.
+In the above example the request will be sent to `http://httbin.org/json`. Any request using the relative uri will use the same `base-uri` to override use the full url.
 
-**NOTE**: There can be multiple assignments to `:base-uri` but, the first one going backwards from the request will be used.
+**NOTE**: There can be multiple assignments to `base-uri` the declaration nearest to the request above the request definition will be used
 
 # In-buffer variables
 
 You declare a variable like this:
 
 ```
-:myvar = the value
+@string-var = the value
 ```
 
 or like this:
 
 ```
-:myvar := (some (artbitrary 'elisp)
+@elisp-var := (base64-encode-string "user:{{string-var}}")
 ```
 
-In second form, the value of variable is evaluated as Emacs Lisp form immediately. Evaluation of variables is done from top to bottom. Only one one-line form for each variable is allowed, so use `(progn ...)` and some virtual line wrap mode if you need more. There's no way to reference earlier declared _restclient_ variables, but you can always use `setq` to save state.
+In second form, the value of variable is evaluated as Emacs Lisp
+form. Variables declared earlier can be referred similar to how they
+are referred inside requests and they will be resovled before sending
+the request.
 
-Variables can be multiline too:
+Variables can be multiline by starting the value with `<<` and ending with `#` in a newline by itself
 
 ```
-:myvar = <<
-Authorization: :my-auth
+@multi-line-var = <<
+Authorization: {{elisp-var}}
 Content-Type: application/json
 User-Agent: SomeApp/1.0
 #
@@ -142,56 +163,75 @@ User-Agent: SomeApp/1.0
 or
 
 ```
-:myvar := <<
-(some-long-elisp
-    (code spanning many lines)
+@digest := (secure-hash 'sha256  "API-Key"))
+@multi-line-evar := <<
+(string-join
+ '("Content-Type: application/json"
+   "Content-Digest: sha-256 {{digest}}")
+ "\n")
 #
 ```
 
-`<<` is used to mark a start of multiline value, the actual value is starting on the next line then. The end of such variable value is the same comment marker `#` and last end of line doesn't count, same is for request bodies.
+`<<` is used to mark a start of multiline value, the actual value is
+starting on the next line then. The end of such variable value is the
+same comment marker `#` and last end of line doesn't count, same is
+for request bodies.
 
-After the var is declared, you can use it in the URL, the header values
-and the body.
+After the var is declared, you can use it in the URL, the header
+values and the body by enclosing the variable name between double
+curly braces `{{` & `}}`.
 
 ```
 # Some generic vars
 
-:my-auth = 319854857345898457457
-:my-headers = <<
-Authorization: :my-auth
+@my-auth = 319854857345898457457
+@my-headers = <<
+Authorization: {{my-auth}}
 Content-Type: application/json
 User-Agent: SomeApp/1.0
 #
 
 # Update a user's name
 
-:user-id = 7
-:the-name := (format "%s %s %d" 'Neo (md5 "The Chosen") (+ 100 1))
+@user-id = 7
+@the-name := (format "%s %s %d" 'Neo (md5 "The Chosen") (+ 100 1))
 
-PUT http://localhost:4000/users/:user-id/
-:my-headers
+PUT http://localhost:4000/users/{{user-id}}/
+{{my-headers}}
 
 { "name": ":the-name" }
 ```
 
-Variables can also be set based on the body of a response using the per-request hooks
+Variables will be resolved based on the dependency for eg.
 
 ```
-# set a variable :my-ip to the value of your ip address using elisp evaluated in the result buffer
+@user = jack
+@password = V3ry5ecreT
+@auth-digest := (base64-encode-string "{{user}}:{{password}}")
+@auth-header = <<
+Authorizatoin: Basic {{auth-digest}}
+#
+```
+
+Variables can also be set based on the body of a response using the
+per-request hooks
+
+```
+# set a variable my-ip to the value of your ip address using elisp evaluated in the result buffer
 GET http://httpbin.org/ip
--> run-hook (restclient-set-var ":my-ip" (cdr (assq 'origin (json-read))))
+-> run-hook (restclient-set-var "my-ip" (cdr (assq 'origin (json-read))))
 
 # same thing with jq if it's installed
 GET http://httpbin.org/ip
--> jq-set-var :my-ip .origin
+-> jq-set-var my-ip .origin
 
 # set a variable :my-var using a more complex jq expression (requires jq-mode)
 GET https://httpbin.org/json
--> jq-set-var :my-var .slideshow.slides[0].title
+-> jq-set-var my-var .slideshow.slides[0].title
 
 # hooks come before the body on POST
 POST http://httpbin.org/post
--> jq-set-var :test .json.test
+-> jq-set-var test .json.test
 
 {"test": "foo"}
 ```
@@ -218,16 +258,41 @@ Content-type: application/json
 
 ### Caveats:
 
-- Multiline variables can be used in headers or body. In URL too, but it doesn't make sense unless it was long elisp expression evaluating to simple value.
-- Yet same variable cannot contain both headers and body, it must be split into two and separated by empty line as usual.
-- Variables now can reference each other, substitution happens in several passes and stops when there's no more variables. Please avoid circular references. There's customizable safeguard of maximum 10 passes to prevent hanging in this case, but it will slow things down.
+- Multiline variables can be used in headers or body. In URL too, but
+  it doesn't make sense unless it was long elisp expression evaluating
+  to simple value.
+- Yet same variable cannot contain both headers and body, it must be
+  split into two and separated by empty line as usual.
+- Variables now can reference each other, substitution happens in
+  several passes and stops when there's no more variables. Please
+  avoid circular references. There's customizable safeguard of maximum
+  10 passes to prevent hanging in this case, but it will slow things
+  down.
 - Variable declaration only considered above request line.
-- Be careful of what you put in that elisp. No security checks are done, so it can format your hardrive. If there's a parsing or evaluation error, it will tell you in the minibuffer.
-- Elisp variables can evaluate to values containing other variable references, this will be substituted too. But you cannot substitute parts of elisp expressions.
+- Be careful of what you put in that elisp. No security checks are
+  done, so it can format your hardrive. If there's a parsing or
+  evaluation error, it will tell you in the minibuffer.
+- Elisp variables can evaluate to values containing other variable
+  references, this will be substituted too. But you cannot substitute
+  parts of elisp expressions.
+- Variables referring to undefined variables and containing circular
+  references will be ignored. Eg.
+
+  ```
+  @user = jack
+  # Since `password` is not defined digest will be ignored with warning
+  @digest := (base64-encode-string "{{user}}:{{password}}")
+  @circular-ref = <<
+  This variable declaration references itself
+  {{circular-ref}} so, it will be ignored with warning
+  #
+  ```
 
 # Customization
 
-There are several variables available to customize `restclient` to your liking. Also, all font lock faces are now customizable in `restclient-faces` group too.
+There are several variables available to customize `restclient` to
+your liking. Also, all font lock faces are now customizable in
+`restclient-faces` group too.
 
 ### restclient-log-request
 
@@ -235,7 +300,8 @@ __Default: t__
 
 Determines whether restclient logs to the \*Messages\* buffer.
 
-If non-nil, restclient requests will be logged. If nil, they will not be.
+If non-nil, restclient requests will be logged. If nil, they will not
+be.
 
 ### restclient-same-buffer-response
 
@@ -243,11 +309,14 @@ __Default: t__
 
 Re-use same buffer for responses or create a new one each time.
 
-If non-nil, re-use the buffer named by `rest-client-buffer-response-name` for all requests.
+If non-nil, re-use the buffer named by
+`rest-client-buffer-response-name` for all requests.
 
-If nil, generate a buffer name based on the request type and url, and increment it for subsequent requests.
+If nil, generate a buffer name based on the request type and url, and
+increment it for subsequent requests.
 
-For example, `GET http://example.org` would produce the following buffer names on 3 subsequent calls:
+For example, `GET http://example.org` would produce the following
+buffer names on 3 subsequent calls:
 - `*HTTP GET http://example.org*`
 - `*HTTP GET http://example.org*<2>`
 - `*HTTP GET http://example.org*<3>`
@@ -256,7 +325,8 @@ For example, `GET http://example.org` would produce the following buffer names o
 
 __Default: \*HTTP Response\*__
 
-Name for response buffer to be used when `restclient-same-buffer-response` is true.
+Name for response buffer to be used when
+`restclient-same-buffer-response` is true.
 
 ### restclient-inhibit-cookies
 
@@ -268,19 +338,24 @@ Inhibit restclient from sending cookies implicitly.
 
 __Default: 100000__
 
-Size of the response buffer restclient can display without huge performance dropdown.
-If response buffer will be more than that, only bare major mode will be used to display it.
-Set to `nil` to disable threshold completely.
+Size of the response buffer restclient can display without huge
+performance dropdown.  If response buffer will be more than that, only
+bare major mode will be used to display it.  Set to `nil` to disable
+threshold completely.
 
 # Known issues
 
-- Comment lines `#` act as end of entity. Yes, that means you can't post shell script or anything with hashes as PUT/POST entity. I'm fine with this right now,
-but may use more unique separator in future.
-- I'm not sure if it handles different encodings, I suspect it won't play well with anything non-ascii. I'm yet to figure it out.
+- Comment lines `#` act as end of entity. Yes, that means you can't
+post shell script or anything with hashes as PUT/POST entity. I'm fine
+with this right now, but may use more unique separator in future.
+- I'm not sure if it handles different encodings, I suspect it won't
+  play well with anything non-ascii. I'm yet to figure it out.
 - Variable usages are not highlighted
-- If your Emacs is older than 26.1, some GET requests to `localhost` might fail because of that
-  [bug](http://debbugs.gnu.org/cgi/bugreport.cgi?bug=17976) in Emacs/url.el. As a workaround you can use `127.0.0.1` instead
-  of `localhost`.
+- If your Emacs is older than 26.1, some GET requests to `localhost`
+  might fail because of that
+  [bug](http://debbugs.gnu.org/cgi/bugreport.cgi?bug=17976) in
+  Emacs/url.el. As a workaround you can use `127.0.0.1` instead of
+  `localhost`.
 
 # History
 

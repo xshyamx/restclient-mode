@@ -1182,10 +1182,10 @@ prompt user for `restclient-current-env-name'"
     (setq-local
      restclient-current-env
      (append nil
-	     (alist-get restclient-current-env-name
-			restclient-envs nil nil #'string=)
-	     (alist-get restclient-shared-env-name
-			restclient-envs nil nil #'string=)))))
+	     (restclient--get-var restclient-envs
+				  restclient-current-env-name)
+	     (restclient--get-var restclient-envs
+				  restclient-shared-env-name)))))
 
 (defun restclient--get-env-names (envs)
   "Return a list of environments names excluding the
@@ -1233,11 +1233,12 @@ conventions"
 (defun restclient-show-info ()
   ;; restclient-info-buffer-name
   (interactive)
-  (let ((vars-at-point (restclient-find-vars-before-point)))
+  (let ((vars-at-point (restclient-find-vars-in-region (point-min) (point)))
+	(overrides-and-env (append restclient-var-overrides restclient-current-env)))
     (cl-labels
 	((non-overidden-vars-at-point ()
 	   (seq-filter (lambda (v)
-			 (null (assoc (car v) restclient-var-overrides)))
+			 (null (assoc (car v) overrides-and-env)))
 		       vars-at-point))
 	 (sanitize-value-cell (var-value)
 	   (replace-regexp-in-string
@@ -1263,13 +1264,36 @@ conventions"
 	  (var-row (car dv) (cdr dv)))
 	(var-table-footer)
 
-	;;    (insert ":Info:\n Dynamic vars defined by request hooks or with calls to restclient-set-var\n:END:")
 
 	(var-table "Vars at current position")
 	(dolist (dv (non-overidden-vars-at-point))
 	  (var-row (car dv) (cdr dv)))
 	(var-table-footer)
 
+	(message "%s / %s" restclient-env-file
+		 restclient-current-env-name)
+	(when (and restclient-env-file
+		   restclient-current-env-name))
+	(insert "Active environment\n"
+		"| Environment File | " restclient-env-file " |\n"
+		"| Environment Name | " restclient-current-env-name " |\n")
+	(var-table-footer)
+
+	(let ((env-vars (restclient--get-var restclient-envs
+					     restclient-current-env-name))
+	      (shared-vars (restclient--get-var restclient-envs
+						restclient-current-env-name)))
+
+	  (var-table (concat "Environment variables in "
+			     restclient-current-env))
+	  (dolist (dv env-vars)
+	    (var-row (car dv) (cdr dv)))
+	  (var-table-footer)
+
+	  (var-table "Shared environment variables")
+	  (dolist (dv shared-vars)
+	    (var-row (car dv) (cdr dv)))
+	  (var-table-footer))
 
 	;; registered callbacks
 	(var-table "Registered request hook types")

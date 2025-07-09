@@ -1,7 +1,9 @@
 # restclient-mode
 
 >[!NOTE]
-> The original http://github.com/pashky/restclient.el was archived on Apri 17, 2024. This is my personal fork with just the changes that I need for my workflow
+> The original http://github.com/pashky/restclient.el was archived on
+> Apri 17, 2024. This is my personal fork with just the changes that I
+> need for my workflow
 
 This is a tool to manually explore and test HTTP REST webservices.
 Runs queries from a plain-text query sheet, displays results as a
@@ -108,28 +110,36 @@ GET http://httpbin.org/ip
 ###
 ```
 
-Lines starting with `#` are considered comments. Each request begins with the method and URI and ends with `###`
+Lines starting with `#` are considered comments. Each request begins
+with the method and URI and ends with `###`
 
-HTTPS and image display requires additional dll's on windows (libtls, libpng, libjpeg etc), which are not in the emacs distribution.
+HTTPS and image display requires additional dll's on windows (libtls,
+libpng, libjpeg etc), which are not in the emacs distribution.
 
 More examples can be found in the `examples` directory.
 
-Declare variables within the buffer anywhere outside of a request by starting the line with `@`. For eg.
+Declare variables within the buffer anywhere outside of a request by
+starting the line with `@`. For eg.
 
 ```
 @base-uri = https://httpbing.org
 ```
 
-Requests can use relative path provided that the `base-uri` variable is defined in the buffer.
+Requests can use relative path provided that the `base-uri` variable
+is defined in the buffer.
 
 ```
 @base-uri = http://httpbin.org
 GET /json
 ```
 
-In the above example the request will be sent to `http://httbin.org/json`. Any request using the relative uri will use the same `base-uri` to override use the full url.
+In the above example the request will be sent to
+`http://httbin.org/json`. Any request using the relative uri will use
+the same `base-uri` to override use the full url.
 
-**NOTE**: There can be multiple assignments to `base-uri` the declaration nearest to the request above the request definition will be used
+**NOTE**: There can be multiple assignments to `base-uri` the
+declaration nearest to the request above the request definition will
+be used
 
 # In-buffer variables
 
@@ -150,7 +160,8 @@ form. Variables declared earlier can be referred similar to how they
 are referred inside requests and they will be resovled before sending
 the request.
 
-Variables can be multiline by starting the value with `<<` and ending with `#` in a newline by itself
+Variables can be multiline by starting the value with `<<` and ending
+with `#` in a newline by itself
 
 ```
 @multi-line-var = <<
@@ -288,66 +299,62 @@ Content-type: application/json
   #
   ```
 
+# Environment files #
+
+In addition to in-buffer variables, variables can be defined in
+environments, which in turn can be defined in files. More than one
+environment may be defined per file.
+
+An environment file is a JSON file containing an object with
+environment names as keys. The value of each key is another JSON
+object with variable names as keys.
+
+The special environment name `$shared` is always loaded in addition to
+the specified environment name. Values defined in the specified
+environment name supersedes the values in she `$shared` section.
+
+After changes to the active environment file, it must be reloaded
+before the changes will be discovered by restclient.
+
+
+```json
+{
+  "$shared": {
+    "base-uri": "https://httpbin.org",
+    "company": "Acme Corp",
+    "name": "John"
+  },
+  "dev": {
+    "username": "devuser",
+    "name": "Jane"
+  },
+  "test": {
+    "username": "test",
+  }
+}
+```
+
+
 # Customization
 
 There are several variables available to customize `restclient` to
 your liking. Also, all font lock faces are now customizable in
 `restclient-faces` group too.
 
-### restclient-log-request
-
-__Default: t__
-
-Determines whether restclient logs to the \*Messages\* buffer.
-
-If non-nil, restclient requests will be logged. If nil, they will not
-be.
-
-### restclient-same-buffer-response
-
-__Default: t__
-
-Re-use same buffer for responses or create a new one each time.
-
-If non-nil, re-use the buffer named by
-`rest-client-buffer-response-name` for all requests.
-
-If nil, generate a buffer name based on the request type and url, and
-increment it for subsequent requests.
-
-For example, `GET http://example.org` would produce the following
-buffer names on 3 subsequent calls:
-- `*HTTP GET http://example.org*`
-- `*HTTP GET http://example.org*<2>`
-- `*HTTP GET http://example.org*<3>`
-
-### restclient-response-buffer-name
-
-__Default: \*HTTP Response\*__
-
-Name for response buffer to be used when
-`restclient-same-buffer-response` is true.
-
-### restclient-inhibit-cookies
-
-__Default: nil__
-
-Inhibit restclient from sending cookies implicitly.
-
-### restclient-response-size-threshold
-
-__Default: 100000__
-
-Size of the response buffer restclient can display without huge
-performance dropdown.  If response buffer will be more than that, only
-bare major mode will be used to display it.  Set to `nil` to disable
-threshold completely.
+| Variable Name | Default Value | Description |
+|----|----|----|
+| `restclient-log-request` | `t` | Determines whether restclient logs to the `*Messages*` buffer. If non-nil, restclient requests will be logged. If nil, they will not be. |
+| `restclient-same-buffer-response` | `t` | Re-use same buffer for responses or create a new one each time. If non-nil, re-use the buffer named by `rest-client-buffer-response-name` for all requests. If nil, generate a buffer name based on the request type and url, and increment it for subsequent requests. |
+| restclient-response-buffer-name | `*HTTP Response*` | Name for response buffer to be used when `restclient-same-buffer-response` is true. |
+| `restclient-inhibit-cookies` | `nil` | Inhibit restclient from sending cookies implicitly. |
+| `restclient-response-size-threshold` | 100000 | Size of the response buffer restclient can display without huge performance dropdown.  If response buffer will be more than that, only bare major mode will be used to display it.  Set to `nil` to disable threshold completely. |
 
 # Known issues
 
 - Comment lines `#` act as end of entity. Yes, that means you can't
-post shell script or anything with hashes as PUT/POST entity. I'm fine
-with this right now, but may use more unique separator in future.
+  post shell script or anything with hashes as PUT/POST entity. I'm
+  fine with this right now, but may use more unique separator in
+  future.
 - I'm not sure if it handles different encodings, I suspect it won't
   play well with anything non-ascii. I'm yet to figure it out.
 - Variable usages are not highlighted

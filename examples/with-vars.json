@@ -1,4 +1,4 @@
 {
     "name": ":text",
-    "awesomness": :number
+    "awesomness": {{number}}
 }

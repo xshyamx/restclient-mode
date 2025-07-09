@@ -1234,7 +1234,14 @@ conventions"
   ;; restclient-info-buffer-name
   (interactive)
   (let ((vars-at-point (restclient-find-vars-in-region (point-min) (point)))
-	(overrides-and-env (append restclient-var-overrides restclient-current-env)))
+	(overrides-and-env (append restclient-var-overrides restclient-current-env))
+	(env-file restclient-env-file)
+	(env-name restclient-current-env-name)
+	(env-vars (restclient--get-var restclient-envs
+				       restclient-current-env-name))
+	(shared-vars (restclient--get-var restclient-envs
+					  restclient-shared-env-name)))
+
     (cl-labels
 	((non-overidden-vars-at-point ()
 	   (seq-filter (lambda (v)
@@ -1270,19 +1277,13 @@ conventions"
 	  (var-row (car dv) (cdr dv)))
 	(var-table-footer)
 
-	(message "%s / %s" restclient-env-file
-		 restclient-current-env-name)
-	(when (and restclient-env-file
-		   restclient-current-env-name))
-	(insert "Active environment\n"
-		"| Environment File | " restclient-env-file " |\n"
-		"| Environment Name | " restclient-current-env-name " |\n")
-	(var-table-footer)
-
-	(let ((env-vars (restclient--get-var restclient-envs
-					     restclient-current-env-name))
-	      (shared-vars (restclient--get-var restclient-envs
-						restclient-current-env-name)))
+	(when (and env-file
+		   env-name)
+	  (var-table "Active environment")
+	  (insert
+	   "| Environment File | " env-file " |\n"
+	   "| Environment Name | " env-name " |\n")
+	  (var-table-footer)
 
 	  (var-table (concat "Environment variables in "
 			     restclient-current-env))

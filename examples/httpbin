@@ -155,7 +155,8 @@ POST http://httpbin.org/post
 #
 @auth-token = abcd1234
 @number := (+ 1 2 3 4)
-@text := (concat "This is " ":num" "ber")
+# still gets resolved
+@text := (concat "This is " "{{num" "ber}}")
 #
 # Multiline variable referencing another variable
 #

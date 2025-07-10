@@ -1,0 +1,9 @@
+# -*- mode: restclient -*-
+# Local Variables:
+# restclient-env-file: "env.json"
+# restclient-env-selected: "dev"
+# End:
+
+# get from environment loaded from file local variables
+GET /json
+###

@@ -1133,17 +1133,19 @@ prompt user for `restclient-env-selected'"
 		(restclient-load-env-file restclient-env-file)))
 
   ;; select environment
-  (let ((en (restclient--get-env-names restclient-env-loaded)))
-    (cond
-     ((eq (length en) 1)
-      (setq-local
-       restclient-env-selected (car en)))
-     ((> (length en) 0)
-      (setq-local
-       restclient-env-selected
-       (completing-read "Select environment" en nil t)))
-     (t (user-error "No valid environments found"))))
-  (message "restclient-env-selected: %s" restclient-env-selected))
+  (unless restclient-env-selected
+    (let ((en (restclient--get-env-names restclient-env-loaded)))
+      (cond
+       ((eq (length en) 1)
+	(setq-local
+	 restclient-env-selected (car en)))
+       ((> (length en) 0)
+	(setq-local
+	 restclient-env-selected
+	 (completing-read "Select environment" en nil t)))
+       (t (user-error "No valid environments found")))))
+  (when restclient-env-selected
+    (message "restclient-env-selected: %s" restclient-env-selected)))
 
 (defun restclient-env-vars ()
   "Returns a list of all the variables from the `restclient-env-selected'
@@ -1190,10 +1192,21 @@ conventions"
 			(mapcar #'restclient--stringify-env envs))))
       (error (message "Failed loading environment file %s" (file-name-nondirectory file))))))
 
-(defun resclient-reload-current-env ()
+(defun restclient--load-env ()
+  "Hook function to load environment file from file local variables"
+  (when (and (eq major-mode 'restclient-mode)
+	     restclient-env-file
+	     (file-exists-p restclient-env-file)
+	     restclient-env-selected)
+    (restclient-set-env t nil nil)))
+
+(defun restclient-reload-current-env ()
   "Reload variables from the current `restclient-env-file'"
   (interactive)
-  (restclient-set-env t))
+  (when (and restclient-env-file
+	     (file-exists-p restclient-env-file)
+	     restclient-env-selected)
+    (restclient-set-env t)))
 
 (defun restclient-change-env ()
   "Change the `restclient-env-selected'"
@@ -1209,6 +1222,13 @@ conventions"
    restclient-env-file nil
    restclient-env-selected nil
    restclient-env-loaded nil))
+
+(defun restclient-find-env-file ()
+  (interactive)
+  (if (and restclient-env-file
+	   (file-exists-p restclient-env-file))
+      (find-file (expand-file-name restclient-env-file))
+    (user-error "Environment file not defined or found")))
 
 (defun restclient--find-next-request (&optional backward)
   "Helper function to jump to the next request. If BACKWARD is not nil the
@@ -1377,6 +1397,7 @@ jumps backwards"
     (keymap-set map "e" #'restclient-change-env)
     (keymap-set map "u" #'restclient-unload-env)
     (keymap-set map "l" #'restclient-load-env-file)
+    (keymap-set map "f" #'restclient-find-env-file)
     map)
   "Keymap for restclient environment")
 
@@ -1437,6 +1458,7 @@ jumps backwards"
   (add-to-invisibility-spec '(outline . t)))
 
 (add-hook 'restclient-mode-hook 'restclient-outline-mode)
+(add-hook 'hack-local-variables-hook #'restclient--load-env)
 
 (provide 'restclient-mode)
 

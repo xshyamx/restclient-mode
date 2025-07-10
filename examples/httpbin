@@ -66,7 +66,7 @@ Content-Type: application/json
 
 # Returns PATCH data.
 PATCH http://httpbin.org/patch
-Content-Type: application/xml
+Content-Type: application/json
 
 [
     {
@@ -91,6 +91,7 @@ GET http://httpbin.org/status/200
 
 # Returns given response headers.
 GET http://httpbin.org/response-headers?key=val
+###
 
 # cookie data.
 GET http://httpbin.org/cookies
@@ -143,7 +144,7 @@ pwd=1234&name={{company}}
 ###
 
 #
-foo: = foo\bar
+@foo = foo\bar
 POST http://httpbin.org/post
 
 {{foo}}
@@ -161,6 +162,7 @@ POST http://httpbin.org/post
 @my-ip = "123.1.1.1"
 @common-headers = <<
 Authentication: {{auth-token}}
+Accept-Charset: utf-8
 User-Agent: MyApp/1.0 | Other app {{my-ip}}
 Content-type: application/json
 #
@@ -177,11 +179,11 @@ POST /post?q=1
 ###
 # ...and another example
 POST http://httpbin.org/post?q=2
-@common-headers
+{{common-headers}}
 
 {
     "other": "body",
-    "common": :common-body
+    "common": {{common-body}}
 }
 
 ### POST replacing variables in file
@@ -199,7 +201,7 @@ Content-Type: application/json
 POST /post?q=4
 -> pre-request (progn (setf (restclient-request-headers request)
 	     (append (list '("Content-Type" . "application/json")
-			   (cons "Content-Digest-Digest"
+			   (cons "Content-Digest"
 				 (concat "sha-256=" (secure-hash 'sha256 (restclient-request-entity request )))))
 		     (restclient-request-headers request)))
        request)

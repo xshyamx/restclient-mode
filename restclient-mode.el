@@ -1393,7 +1393,7 @@ jumps backwards"
 
 (defvar restclient-env-mode-map
   (let ((map (make-sparse-keymap)))
-    (keymap-set map "r" #'resclient-reload-current-env)
+    (keymap-set map "r" #'restclient-reload-current-env)
     (keymap-set map "e" #'restclient-change-env)
     (keymap-set map "u" #'restclient-unload-env)
     (keymap-set map "l" #'restclient-load-env-file)

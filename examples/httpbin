@@ -6,9 +6,8 @@
 
 # Returns Origin IP.
 GET /ip
--> run-hook (with-current-buffer "*HTTP Response*"
-  (goto-char (point-min))
-  (set-var "origin" (alist-get 'origin (json-read-object))))
+-> run-hook (restclient-set-var "origin" (alist-get 'origin (json-read-object)))
+
 ###
 
 # Returns user-agent.
@@ -160,7 +159,7 @@ POST http://httpbin.org/post
 #
 # Multiline variable referencing another variable
 #
-@my-ip = "123.1.1.1"
+@my-ip = 123.1.1.1
 @common-headers = <<
 Authentication: {{auth-token}}
 Accept-Charset: utf-8
@@ -217,9 +216,16 @@ Content-type: text/plain
 ###
 
 # Test for issue #121
-POST http://httpbin.org/post
+POST http://httpbin.org/post?q=json
 
 {"json": "that looks like header"}
+###
+
+# Form submit
+POST /post?q=form
+Content-Type: application/x-www-form-urlencoded
+
+one=1&two=34
 ###
 
 # Resolve variables in file upload
@@ -250,7 +256,7 @@ GET /response-headers?Content-Type=application/vnd.whatever%2Bjson;%20charset=UT
 
 # set a variable to the value of your ip address using a jq expression
 GET http://httpbin.org/ip
--> jq-set-var :my-ip .origin
+-> jq-set-var my-ip .origin
 ###
 
 # multiple elsip hooks on call
@@ -289,18 +295,25 @@ POST /response-headers?X-Custom-Id=one
 ###
 
 ### GET /json
+# override base-uri
 @base-uri = http://localhost:8080
 GET /json
--> run-hook (with-current-buffer restclient-response-buffer-name
-	(when-let (obj (json-read-object))
-		(restclient-set-var "json" (json-encode obj))))
+-> run-hook (when-let (obj (json-read-object))
+   		(restclient-set-var "json" (json-encode obj)))
 
 ###
 
 @base-uri = http://httpbin.org
 ### POST
-POST /post
+POST /post?q=json-var
 Content-Type: application/json
 
 {{json}}
+###
+
+GET /image/jpeg
+###
+
+GET /uuid
+-> run-hook (restclient-set-var "uuid" (alist-get 'uuid (json-read-object)))
 ###

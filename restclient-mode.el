@@ -21,6 +21,7 @@
 (require 'url)
 (require 'json)
 (require 'outline)
+(require 'restclient-variables)
 (eval-when-compile (require 'subr-x))
 (eval-when-compile
   (if (version< emacs-version "26")
@@ -212,18 +213,40 @@ hanging if two variables reference each other directly or indirectly."
   :type 'integer)
 
 (defconst restclient-comment-separator "#")
+
+(defconst restclient-var-prefix "@"
+  "Prefix character to used to define variables")
+
+(defconst restclient-var-use-prefix "{{"
+  "Prefix string when using a variable")
+
+(defconst restclient-var-use-suffix "}}"
+  "Suffix string when using a variable")
+
+(defconst restclient-elisp-var-assigment ":="
+  "Elisp variable assignment")
+
+(defconst restclient-multi-line-begin "<<"
+  "Marker for beginning of a multi-line variable value")
+
+(defconst restclient-multi-line-end (rx bol "#" eol)
+  "Marker for end of a multi-line variable value")
+
 (defconst restclient-comment-start-regexp
-  (concat "^" restclient-comment-separator))
+  (rx-to-string `(: bol ,restclient-comment-separator) t)
+  "Comment start regexp")
+
 (defconst restclient-comment-not-regexp
-  (concat "^[^" restclient-comment-separator "]"))
-(defconst restclient-empty-line-regexp "^\\s-*$")
+  (rx-to-string `(: bol (not ,restclient-comment-separator)) t)
+  "Non-comment line start regexp")
+
+(defconst restclient-empty-line-regexp
+  (rx bol (* space) eol)
+  "Empty line regexp")
 
 (defconst restclient-http-methods
   '("GET" "POST" "PUT" "DELETE" "HEAD" "OPTIONS" "PATCH")
   "Support HTTP methods")
-
-(defconst restclient-var-prefix "@"
-  "Prefix character to used to define variables")
 
 (defconst restclient-method-url-regexp
   (rx-to-string `(: bol
@@ -239,10 +262,43 @@ hanging if two variables reference each other directly or indirectly."
   "Regexp to match the end of a request block")
 
 (defconst restclient-header-regexp
-  "^\\([^](),/:;@[\\{}= \t<]+\\): \\(.*\\)$")
+  (rx-to-string
+   `(: bol (group
+	    (+ (not
+		(or
+		 ,@(seq-subseq (split-string "[](){}=<,/:@" "") 1 -1)
+		 space))))
+       ":" (+ space)
+       (group (* any)))
+   t)
+  "HTTP Header regexp")
 
 (defconst restclient-header-var-regexp
-  (rx bol (group "{{" (+ (not (or "}" space "\n"))) "}}") eol))
+  (rx-to-string
+   `(: bol (group ,restclient-var-use-prefix
+		  (+ (not
+		      (or ,(substring restclient-var-use-suffix 0 1)
+			  space "\n")))
+		  ,restclient-var-use-suffix)
+       eol)
+   t)
+  "Headers regexp")
+
+(defconst restclient-var-declaration-regexp
+  (rx bol
+      ;; variable name
+      "@"
+      (group
+       (or alpha "_")
+       (*? (or alnum "-" "_")))
+      (* space)
+      ;; assignment
+      (group (? ":") "=")
+      (* space)
+      ;; multi-line
+      (group (or "<<" (* not-newline)))
+      eol)
+  "Variable declaration regexp")
 
 (defconst restclient-var-regexp
   (concat "^\\(?:" restclient-var-prefix "\\([^:= ]+\\)\\)[ \t]*\\(:?\\)=[ \t]*\\(<<[ \t]*\n\\(\\(.*\n\\)*?\\)" restclient-comment-separator "\\|\\([^<].*\\)$\\)"))
@@ -542,221 +598,12 @@ Content-Type header. If no charset is specified, default to UTF-8."
       (progn (goto-char (point-max))
              (if (looking-at "^$") (- (point) 1) (point))))))
 
-(defun restclient-resolve-string (string vars)
-  (if vars
-      (with-temp-buffer
-	(insert string)
-	(let ((pass restclient-vars-max-passes)
-	      (continue t)
-	      (regex (rx-to-string
-		      `(seq "{{"
-			    (group (or ,@(seq-filter #'identity (mapcar #'car vars))))
-			    "}}"))))
-	  (while (and continue (> pass 0))
-            (setq pass (- pass 1))
-	    (goto-char (point-min))
-	    (while (re-search-forward regex nil t)
-	      (let ((var (match-string-no-properties 1)))
-		(setq continue t)
-		(replace-match (alist-get var vars nil nil #'string=) t t)))))
-	(buffer-string))
-    string))
-
 (defun restclient-replace-all-in-header (header replacements)
   (cons (car header)
 	(restclient-resolve-string (cdr header) replacements)))
 
 (defun restclient-chop (text)
   (if text (replace-regexp-in-string "\n$" "" text) nil))
-
-
-(defun restclient--find-dependencies (string)
-  "Find the dependent variables used in the string ie. anything enclosed in
-`{{' `}}'.
-
-Variables names follow the following rules
-
-1. Must start with an alphabet or underscore
-2. Can contain alphanumeric characters, underscores or hyphens"
-  (let ((deps))
-    (with-temp-buffer
-      (insert string)
-      (goto-char (point-min))
-      (while (re-search-forward
-	      (rx "{{" (group
-			(or alpha "_")
-			(*? (or alnum "-" "_")))
-		  "}}")
-	      nil t)
-	(push (match-string-no-properties 1) deps)))
-    (seq-uniq deps #'string=)))
-
-(defun restclient-find-vars-in-region (begin end)
-  "Find all variables defined in region and return a list of variables
-where each variable is of the form
-
-(name value evaluated dependent-variables)"
-  (let ((vars))
-    (save-excursion
-      (goto-char begin)
-      (while (re-search-forward
-	      (rx bol
-		  ;; variable name
-		  "@"
-		  (group
-		   (or alpha "_")
-		   (*? (or alnum "-" "_")))
-		  (* space)
-		  ;; assignment
-		  (group (? ":") "=")
-		  (* space)
-		  ;; multi-line
-		  (group (or "<<" (* not-newline)))
-		  eol)
-	      end t)
-	(let ((name (match-string-no-properties 1))
-	      (assignment (match-string-no-properties 2))
-	      (should-eval (string= ":=" (match-string-no-properties 2)))
-	      (candidate (match-string-no-properties 3))
-	      (value-begin (match-beginning 3))
-	      (value))
-	  (setq value
-		(cond
-		 ((string= "<<" candidate)
-		  (forward-line)
-		  (setq value-begin (line-beginning-position))
-		  (re-search-forward (rx bol "#" eol) )
-		  (forward-line -1)
-		  (buffer-substring-no-properties
-		   value-begin
-		   (line-end-position)))
-		 ((and (not (string= "<<" candidate))
-		       (string= ":=" assignment))
-		  (goto-char value-begin)
-		  (forward-sexp)
-		  (buffer-substring-no-properties
-		   value-begin
-		   (point)))
-		 (t candidate)))
-	  (push (list name value should-eval
-		      (restclient--find-dependencies value))
-		vars))))
-    ;; return in order of priority overrides, variables, environment
-    (let* ((env-vars (restclient-env-vars))
-	   (extra-vars (append restclient-var-overrides env-vars)))
-      (append restclient-var-overrides
-	      (restclient-resolve-variables vars extra-vars)
-	      env-vars))))
-
-(defun restclient--unresolved-variables (pending resolved)
-  "Return a list unresolved variables in PENDING list by removing variables
-that are present in the RESOLVED list"
-  (seq-filter
-   (lambda (v) (not (assoc-string (car v) resolved)))
-   pending))
-
-(defun restclient--resolvable-variables (pending resolved)
-  "Return the list of variables from PENDING list whose dependences are all
-found in the RESOLVED list"
-  (seq-filter
-   (lambda (v) (let ((deps (nth 3 v)))
-	    ;; all dependencies are available in resolved list of variables
-	    (eq
-	     (length deps)
-	     (length (remove nil
-			     (mapcar
-			      (lambda (dep) (assoc-string dep resolved))
-			      deps))))))
-   pending))
-
-(defun restclient-resolve-variables (vars extra-vars)
-  "Resolve the variables defined in the buffer VARS with values from
-EXTRA-VARS which is composed of `restclient-var-overrides' &
-`restclient-env-vars'"
-  (let* ((var-names (mapcar #'car (append vars extra-vars)))
-	 (resolved (append
-		    (mapcar
-		     (lambda (v) (cons (car v)
-				  (let ((val (cadr v)))
-				    (if (nth 2 v)
-					(restclient-eval-var val)
-				      val))))
-		     (seq-filter    ; filter vars with no dependencies
-		      (lambda (v) (= (length (nth 3 v)) 0)) vars))
-		    extra-vars))
-	 (missing (mapcar
-		   #'car
-		   (seq-filter
-		    (lambda (v)
-		      (> (length (seq-difference (nth 3 v)
-						 var-names))
-			 0))
-		    vars)))
-	 (circular-deps (mapcar
-			 #'car
-			 (seq-filter
-			  (lambda (v) (member (car v) (nth 3 v)))
-			  vars)))
-	 (pending (seq-filter
-		   (lambda (v) (and (> (length (nth 3 v)) 0)
-			       (not (member (car v) circular-deps))
-			       (not (member (car v) missing))))
-		   vars))
-	 (resolvable))
-    (when (or missing
-	      circular-deps)
-      (message (concat "Skipping %s with missing variables "
-		       "& %s with circular dependencies")
-	       missing circular-deps))
-    ;; calculate resolvable
-    (setq resolvable (restclient--resolvable-variables pending resolved))
-    ;; If there are resolved variables then we can resolve the pending
-    ;; & resolvable
-    (while (and
-	    (> (length resolved) 0)
-	    (or
-	     (> (length pending) 0)
-	     (> (length resolvable) 0)))
-      ;; resolve the resolvables
-      (dolist (var resolvable)
-	(push
-	 (cons (car var)
-	       ;; evaluate var if resolved
-	       (let ((val (restclient-resolve-string (nth 1 var) resolved)))
-		 (if (nth 2 var)
-		     (restclient-eval-var val)
-		   val)))
-	 resolved))
-
-      (setq
-       ;; calculate the new pending list by removing resolved variables
-       ;; from the pending list
-       pending (restclient--unresolved-variables pending resolved)
-       ;; calculate the resolvable variables as before
-       resolvable (restclient--resolvable-variables pending resolved)))
-    resolved))
-
-(defun restclient-find-vars-before-point ()
-  (let ((vars nil)
-        (bound (point)))
-    (save-excursion
-      (goto-char (point-min))
-      (while (search-forward-regexp restclient-var-regexp bound t)
-        (let ((name (match-string-no-properties 1))
-              (should-eval (> (length (match-string 2)) 0))
-              (value (or (restclient-chop
-			  (match-string-no-properties 4))
-			 (match-string-no-properties 3))))
-          (setq vars
-		(cons
-		 (cons name
-		       (if should-eval
-			   (restclient-eval-var value) value))
-		 vars))))
-      (append restclient-var-overrides vars (restclient-env-vars)))))
-
-(defun restclient-eval-var (string)
-  (with-output-to-string (princ (eval (read string)))))
 
 (defun restclient-make-header (&optional string)
   (cons (match-string-no-properties 1 string)
@@ -796,11 +643,7 @@ EXTRA-VARS which is composed of `restclient-var-overrides' &
 (defun restclient-set-var-from-header (var header)
   (let* ((headers (restclient-get-response-headers))
 	 (val (restclient--get-var headers header)))
-    (when (local-variable-if-set-p 'restclient-buffer-name)
-      (with-current-buffer restclient-buffer-name
-	(when (and (stringp val)
-		   (> (length val) 0))
-	  (restclient-set-var var val))))))
+    (restclient-set-var var val)))
 
 (defun restclient-read-file (path)
   (with-temp-buffer
@@ -848,12 +691,7 @@ EXTRA-VARS which is composed of `restclient-var-overrides' &
 	  (save-excursion
 	    (switch-to-buffer buffer-name)
 	    (goto-char buffer-pos)
-	    ;; if we're called from a restclient buffer we need to
-	    ;; lookup vars before the current hook or evar outside a
-	    ;; restclient buffer only globals are available so moving
-	    ;; the point wont matter
-	    (re-search-backward "^:\\|->" (point-min) t)
-	    (restclient-find-vars-before-point))))
+	    (restclient-find-in-region (point-min) (point)))))
     (if-let (value (cdr (assoc var-name vars-at-point)))
 	(restclient-resolve-string value vars-at-point)
       nil)))
@@ -875,8 +713,11 @@ EXTRA-VARS which is composed of `restclient-var-overrides' &
 
 
 (defun restclient-http-parse-current-and-do (func &rest args)
+  (goto-char
+   (if-let (begin (restclient-current-min))
+       begin
+     (restclient-jump-next)))
   (save-excursion
-    (goto-char (restclient-current-min))
     (when (re-search-forward restclient-method-url-regexp (point-max) t)
       (let ((method (match-string-no-properties 1))
             (url (string-trim (match-string-no-properties 2)))
@@ -970,23 +811,23 @@ clipboard."
                                      " "))))
       (message "curl command copied to clipboard."))))
 
-
-(defun restclient--elisp-helpers (buffer)
-  `(progn (defun set-var (name value)
-	    (message "Setting %s" name)
-	    (with-current-buffer ,buffer
-	      (restclient-set-var name value)))
-	  (defun get-var (name)
-	    (with-current-buffer ,buffer
-	      (restclient-get-var name)))))
-
 (defun restclient-elisp-result-function (args offset)
   (goto-char offset)
-  (let ((form (macroexpand-all (read (current-buffer)))))
+  (let ((bufname (buffer-name (current-buffer)))
+	(form (macroexpand-all (read (current-buffer)))))
     (lambda ()
-      (eval (progn
-	      (restclient--elisp-helpers (buffer-name (current-buffer)))
-	      form)))))
+      (eval form)
+      (let ((var-overrides (buffer-local-value
+			    'restclient-var-overrides (current-buffer))))
+	(with-current-buffer bufname
+	  ;; remove overriden keys from response buffer
+	  (dolist (var var-overrides)
+	    (setq-local restclient-var-overrides
+			(assoc-delete-all (car var) restclient-var-overrides)))
+	  ;; merge changes from response buffer to restclient buffer
+	  (setq-local
+	   restclient-var-overrides
+	   (append var-overrides restclient-var-overrides)))))))
 
 (defun restclient--select-method (table prompt &optional format)
   (let (allowed-keys rtn pressed formatter buffer (inhibit-quit t))
@@ -1096,11 +937,17 @@ Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
   (interactive)
   (restclient-http-send-current nil nil t))
 
+;; (propertize out-string
+;;             'help-echo msg
+;;             'face (if (> exit-status 0)
+;;                       'compilation-mode-line-fail
+;;                     'compilation-mode-line-exit))
 (defun restclient--mode-name ()
   (if (> (length restclient-env-selected) 0)
       (concat "REST env["
 	      (propertize restclient-env-selected
-			  'face 'mode-line-highlight)
+			  'help-echo restclient-env-selected
+			  'face 'compilation-mode-line-exit)
 	      "]")
     restclient-default-mode-name))
 
@@ -1223,6 +1070,12 @@ conventions"
    restclient-env-selected nil
    restclient-env-loaded nil))
 
+(defun restclient-unload-dynamic-vars ()
+  "Unloads the current dynamic variables in the restclient buffer"
+  (interactive)
+  (setq-local
+   restclient-var-overrides nil))
+
 (defun restclient-find-env-file ()
   (interactive)
   (if (and restclient-env-file
@@ -1258,7 +1111,7 @@ jumps backwards"
   ;; restclient-info-buffer-name
   (interactive)
   (let ((vars-at-point (restclient-find-vars-in-region (point-min) (point)))
-	(overrides-and-env (append restclient-var-overrides (restclient-env-vars)))
+	(overridden-vars restclient-var-overrides)
 	(env-file restclient-env-file)
 	(env-name restclient-env-selected)
 	(env-vars (restclient--get-var restclient-env-loaded
@@ -1292,13 +1145,13 @@ jumps backwards"
 	(insert "* Restclient Info\n\n")
 
 	(var-table "Dynamic Variables")
-	(dolist (dv restclient-var-overrides)
+	(dolist (dv overridden-vars)
 	  (var-row (car dv) (cdr dv)))
 	(var-table-footer)
 
 
 	(var-table "Vars at current position")
-	(dolist (dv (non-overidden-vars-at-point))
+	(dolist (dv vars-at-point)
 	  (var-row (car dv) (cdr dv)))
 	(var-table-footer)
 
@@ -1398,6 +1251,7 @@ jumps backwards"
     (keymap-set map "u" #'restclient-unload-env)
     (keymap-set map "l" #'restclient-load-env-file)
     (keymap-set map "f" #'restclient-find-env-file)
+    (keymap-set map "d" #'restclient-unload-dynamic-vars)
     map)
   "Keymap for restclient environment")
 

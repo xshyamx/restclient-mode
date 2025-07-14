@@ -2,7 +2,7 @@
 
 >[!NOTE]
 > The original http://github.com/pashky/restclient.el was archived on
-> Apri 17, 2024. This is my personal fork with just the changes that I
+> April 17, 2024. This is my personal fork with just the changes that I
 > need for my workflow
 
 This is a tool to manually explore and test HTTP REST webservices.
@@ -47,7 +47,7 @@ and supports a few additional keypresses:
 | `C-c C-a` | Show all collapsed regions |
 | `C-c C-i` | Show information on restclient variables at point |
 
-The last two functions are implemented as `restclient-outline-mode` minor mode, which is activated by default via hook for major mode. Remove this hook using `(remove-hook 'restclient-mode-hook 'restclient-outline-mode)` if you don't wish to have this behaviour, or it clashes with any other binding for `TAB` like autocomplete.
+The last two functions are implemented as `restclient-outline-mode` minor mode, which is activated by default via hook for major mode. Remove this hook using `(remove-hook 'restclient-mode-hook 'restclient-outline-mode)` if you don't wish to have this behavior, or it clashes with any other binding for `TAB` like autocomplete.
 
 Query file example:
 
@@ -220,7 +220,7 @@ Variables will be resolved based on the dependency for eg.
 @password = V3ry5ecreT
 @auth-digest := (base64-encode-string "{{user}}:{{password}}")
 @auth-header = <<
-Authorizatoin: Basic {{auth-digest}}
+Authorization: Basic {{auth-digest}}
 #
 ```
 

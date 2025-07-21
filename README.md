@@ -36,8 +36,8 @@ and supports a few additional keypresses:
 | `C-c C-r` | Same, but doesn't do anything with the response, just shows the buffer |
 | `C-c C-v` | Same as `C-c C-c`, but switches focus to other window |
 | `C-c C-b` | Same as `C-c C-c`, but doesn't show response buffer |
-| `C-c C-p` | Jump to the previous query |
-| `C-c C-n` | Jump to the next query |
+| `C-c C-p` | Jump to the previous query. Alternative `M-p` |
+| `C-c C-n` | Jump to the next query. Alternative `M-n` |
 | `C-c C-.` | Mark the query under the cursor |
 | `C-c C-u` | Copy query under the cursor as a curl command |
 | `C-c C-g` | Start a [helm](https://emacs-helm.github.io/helm/) session with sources for variables and requests (if helm is available, of course) |
@@ -54,7 +54,7 @@ and supports a few additional keypresses:
 | `C-c e f` | Open the current environment file |
 | `C-c e d` | Clear all dynamic variables |
 
-The last two functions are implemented as `restclient-outline-mode` minor mode, which is activated by default via hook for major mode. Remove this hook using `(remove-hook 'restclient-mode-hook 'restclient-outline-mode)` if you don't wish to have this behavior, or it clashes with any other binding for `TAB` like autocomplete.
+The narowing + show/hide functions are implemented as `restclient-outline-mode` minor mode, which is activated by default via hook for major mode. Remove this hook using `(remove-hook 'restclient-mode-hook 'restclient-outline-mode)` if you don't wish to have this behavior, or it clashes with any other binding for `TAB` like autocomplete.
 
 Query file example:
 
@@ -118,7 +118,9 @@ GET http://httpbin.org/ip
 ```
 
 Lines starting with `#` are considered comments. Each request begins
-with the method and URI and ends with `###`
+with the method and URI and ends with `###`. Each request is treated
+as an [emacs paragraph](https://www.gnu.org/software/emacs/manual/html_node/emacs/Paragraphs.html)
+so, the paragrap traversal keybindings `M-{` & `M-}` work too.
 
 HTTPS and image display requires additional dll's on windows (libtls,
 libpng, libjpeg etc), which are not in the emacs distribution.

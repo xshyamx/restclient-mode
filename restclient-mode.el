@@ -989,7 +989,7 @@ prompt user for `restclient-env-selected'"
        ((> (length en) 0)
 	(setq-local
 	 restclient-env-selected
-	 (completing-read "Select environment" en nil t)))
+	 (completing-read "Select environment: " en nil t)))
        (t (user-error "No valid environments found")))))
   (when restclient-env-selected
     (message "restclient-env-selected: %s" restclient-env-selected)))

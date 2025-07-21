@@ -46,6 +46,13 @@ and supports a few additional keypresses:
 | `TAB` | hide/show current request body |
 | `C-c C-a` | Show all collapsed regions |
 | `C-c C-i` | Show information on restclient variables at point |
+| `C-c e` | Environment prefix |
+| `C-c e e` | Select environment file & environment |
+| `C-c e l` | Load a new environment file  |
+| `C-c e r` | Reload current environment file to refresh environment |
+| `C-c e u` | Unload current environment |
+| `C-c e f` | Open the current environment file |
+| `C-c e d` | Clear all dynamic variables |
 
 The last two functions are implemented as `restclient-outline-mode` minor mode, which is activated by default via hook for major mode. Remove this hook using `(remove-hook 'restclient-mode-hook 'restclient-outline-mode)` if you don't wish to have this behavior, or it clashes with any other binding for `TAB` like autocomplete.
 

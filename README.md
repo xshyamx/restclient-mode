@@ -288,8 +288,8 @@ before the changes will be discovered by restclient.
 |---|---------------|-------------|
 | 1 | Dynamic variables | Set dynamically as part of response hooks |
 | 2 | In-buffer variables |Declared in the buffer in moving up from current postion to the beginning of the buffer |
-| 3 | Variables from the current selected environment (if environment is selected) |
-| 4 | Shared variables from the environment file (if enviroment is selected) |
+| 3 | Environment variables | Variables from the current selected environment (if environment is selected) |
+| 4 | Environment shared variables | Variables defined under the `$shared` key from the environment file (if enviroment is selected) |
 
 # File uploads
 

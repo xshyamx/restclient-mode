@@ -247,6 +247,50 @@ POST http://httpbin.org/post
 {"test": "foo"}
 ```
 
+# Environment files #
+
+In addition to in-buffer variables, variables can be defined in
+environments, which in turn can be defined in files. More than one
+environment may be defined per file.
+
+An environment file is a JSON file containing an object with
+environment names as keys. The value of each key is another JSON
+object with variable names as keys.
+
+The special environment name `$shared` is always loaded in addition to
+the specified environment name. Values defined in the specified
+environment name supersedes the values in she `$shared` section.
+
+After changes to the active environment file, it must be reloaded
+before the changes will be discovered by restclient.
+
+
+```json
+{
+  "$shared": {
+    "base-uri": "https://httpbin.org",
+    "company": "Acme Corp",
+    "name": "John"
+  },
+  "dev": {
+    "username": "devuser",
+    "name": "Jane"
+  },
+  "test": {
+    "username": "test",
+  }
+}
+```
+
+*NOTE*: The order of precedence for resolving variables is as follows
+
+| # | Variable Type | Description |
+|---|---------------|-------------|
+| 1 | Dynamic variables | Set dynamically as part of response hooks |
+| 2 | In-buffer variables |Declared in the buffer in moving up from current postion to the beginning of the buffer |
+| 3 | Variables from the current selected environment (if environment is selected) |
+| 4 | Shared variables from the environment file (if enviroment is selected) |
+
 # File uploads
 
 Restclient now allows to specify file path to use as a body, like this:
@@ -298,42 +342,6 @@ Content-type: application/json
   {{circular-ref}} so, it will be ignored with warning
   #
   ```
-
-# Environment files #
-
-In addition to in-buffer variables, variables can be defined in
-environments, which in turn can be defined in files. More than one
-environment may be defined per file.
-
-An environment file is a JSON file containing an object with
-environment names as keys. The value of each key is another JSON
-object with variable names as keys.
-
-The special environment name `$shared` is always loaded in addition to
-the specified environment name. Values defined in the specified
-environment name supersedes the values in she `$shared` section.
-
-After changes to the active environment file, it must be reloaded
-before the changes will be discovered by restclient.
-
-
-```json
-{
-  "$shared": {
-    "base-uri": "https://httpbin.org",
-    "company": "Acme Corp",
-    "name": "John"
-  },
-  "dev": {
-    "username": "devuser",
-    "name": "Jane"
-  },
-  "test": {
-    "username": "test",
-  }
-}
-```
-
 
 # Customization
 

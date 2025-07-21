@@ -1185,6 +1185,8 @@ jumps backwards"
 
 	(insert "\n\n'q' to exit\n")
 	(org-mode)
+	(setq-local
+	 org-use-sub-superscripts nil)
 	(org-toggle-pretty-entities)
 	(org-table-iterate-buffer-tables)
 	(outline-show-all)

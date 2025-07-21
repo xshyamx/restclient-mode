@@ -19,7 +19,7 @@
 
 ;;; Code:
 ;;
-(require 'restclient)
+(require 'restclient-mode)
 (require 'jq-mode)
 
 ;; --- jq support
@@ -56,14 +56,16 @@
 
 ARGS contains the variable name and a jq pattern to use."
   (save-match-data
-    (and (string-match "\\(:[^: \n]+\\) \\(.*\\)$" args)
+    (and (string-match "\\([[:word:]-_]+\\) \\(.*\\)$" args)
          (let ((var-name (match-string 1 args))
-               (jq-patt (match-string 2 args)))
+               (jq-patt (match-string 2 args))
+	       (bufname (buffer-name (current-buffer))))
            (lambda ()
              (let ((resp-val (restclient-jq-get-var jq-patt)))
-               (restclient-remove-var var-name)
-               (restclient-set-var var-name resp-val)
-               (message "restclient var [%s = \"%s\"] " var-name resp-val)))))))
+	       (with-current-buffer bufname
+		 (restclient-remove-var var-name)
+		 (restclient-set-var var-name resp-val)
+		 (message "restclient var [%s = \"%s\"] " var-name resp-val))))))))
 
 (defun restclient-jq-interactive-result ()
   "Run jq interactively on a restclient JSON response buffer."

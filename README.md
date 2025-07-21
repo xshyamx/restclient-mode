@@ -120,7 +120,7 @@ GET http://httpbin.org/ip
 Lines starting with `#` are considered comments. Each request begins
 with the method and URI and ends with `###`. Each request is treated
 as an [emacs paragraph](https://www.gnu.org/software/emacs/manual/html_node/emacs/Paragraphs.html)
-so, the paragrap traversal keybindings `M-{` & `M-}` work too.
+so, the paragraph traversal keybindings `M-{` & `M-}` work too.
 
 HTTPS and image display requires additional dll's on windows (libtls,
 libpng, libjpeg etc), which are not in the emacs distribution.

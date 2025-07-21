@@ -1110,7 +1110,7 @@ jumps backwards"
 (defun restclient-show-info ()
   ;; restclient-info-buffer-name
   (interactive)
-  (let ((vars-at-point (restclient-find-vars-in-region (point-min) (point)))
+  (let ((vars-at-point (restclient--vars-declared-in-region (point-min) (point)))
 	(overridden-vars restclient-var-overrides)
 	(env-file restclient-env-file)
 	(env-name restclient-env-selected)
@@ -1150,8 +1150,12 @@ jumps backwards"
 	(var-table-footer)
 
 
-	(var-table "Vars at current position")
-	(dolist (dv vars-at-point)
+	(var-table "Variables declared before current line")
+	(dolist (dv (restclient-resolve-vars
+		     vars-at-point
+		     (append overridden-vars
+			     env-vars
+			     shared-vars)))
 	  (var-row (car dv) (cdr dv)))
 	(var-table-footer)
 

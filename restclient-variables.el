@@ -19,23 +19,27 @@
 	(insert string)
 	(let ((pass restclient-vars-max-passes)
 	      (continue t)
-	      (regex (rx-to-string
-		      `(seq "{{"
-			    (group (or ,@(seq-filter #'identity (mapcar #'car vars))))
-			    "}}"))))
+	      (regex
+	       (rx-to-string
+		`(seq "{{"
+		      (group
+		       (or ,@(seq-filter
+			      #'identity (mapcar #'car vars))))
+		      "}}"))))
 	  (while (and continue (> pass 0))
             (setq pass (- pass 1))
 	    (goto-char (point-min))
 	    (while (re-search-forward regex nil t)
 	      (let ((var (match-string-no-properties 1)))
 		(setq continue t)
-		(replace-match (alist-get var vars nil nil #'string=) t t)))))
+		(replace-match
+		 (alist-get var vars nil nil #'string=) t t)))))
 	(buffer-string))
     string))
 
 (defun restclient--find-dependencies (string)
-  "Find the dependent variables used in the string ie. anything enclosed in
-`{{' `}}'.
+  "Find the dependent variables used in the string ie. anything
+enclosed in `{{' `}}'.
 
 Variables names follow the following rules
 
@@ -140,9 +144,9 @@ resolved"
 (defun restclient-eval-var (string)
   (with-output-to-string (princ (eval (read string)))))
 
-(defun restclient-find-vars-in-region (begin end)
-  "Find all variables defined in region and return a list of variables
-where each variable is of the form
+(defun restclient--vars-declared-in-region (begin end)
+  "Find all variables declared in region without resolution. Each variable
+is of the form
 
 (name value evaluated dependent-variables)"
   (let ((vars))
@@ -177,6 +181,26 @@ where each variable is of the form
 	  (push (list name value should-eval
 		      (restclient--find-dependencies value))
 		vars))))
+    vars))
+
+(defun restclient-find-vars-in-region (begin end)
+  "Find all variables defined in region and return a list of variables
+where each variable is of the form
+
+(name . value)
+
+The variables are returned in the order of precedence which is
+
+1. Dynamic variables
+
+2. Variables declared in the buffer within the region defined by
+   BEGIN & END (these are resolved with values from the rest of
+   the variables)
+
+3. Variables from the selected environment
+
+4. Shared variables from the environment"
+  (let ((vars (restclient--vars-declared-in-region begin end)))
     ;; return in order of priority overrides, variables, environment
     (let* ((env-vars (restclient-env-vars))
 	   (extra-vars (append restclient-var-overrides env-vars)))

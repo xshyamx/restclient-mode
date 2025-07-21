@@ -51,7 +51,7 @@ The last two functions are implemented as `restclient-outline-mode` minor mode, 
 
 Query file example:
 
-```
+``` sh
 # -*- mode: restclient -*-
 #
 # Gets  all Github APIs, formats JSON, shows response status and headers underneath.
@@ -192,7 +192,7 @@ After the var is declared, you can use it in the URL, the header
 values and the body by enclosing the variable name between double
 curly braces `{{` & `}}`.
 
-```
+``` sh
 # Some generic vars
 
 @my-auth = 319854857345898457457
@@ -227,7 +227,7 @@ Authorization: Basic {{auth-digest}}
 Variables can also be set based on the body of a response using the
 per-request hooks
 
-```
+``` sh
 # set a variable my-ip to the value of your ip address using elisp evaluated in the result buffer
 GET http://httpbin.org/ip
 -> run-hook (restclient-set-var "my-ip" (cdr (assq 'origin (json-read))))
@@ -333,7 +333,7 @@ Content-type: application/json
 - Variables referring to undefined variables and containing circular
   references will be ignored. Eg.
 
-  ```
+  ``` sh
   @user = jack
   # Since `password` is not defined digest will be ignored with warning
   @digest := (base64-encode-string "{{user}}:{{password}}")

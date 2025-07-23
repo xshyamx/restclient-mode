@@ -56,7 +56,7 @@
 
 ARGS contains the variable name and a jq pattern to use."
   (save-match-data
-    (and (string-match "\\([[:word:]-_]+\\) \\(.*\\)$" args)
+    (and (string-match "\\([[:word:]_-]+\\) \\(.*\\)$" args)
          (let ((var-name (match-string 1 args))
                (jq-patt (match-string 2 args))
 	       (bufname (buffer-name (current-buffer))))

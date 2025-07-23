@@ -14,13 +14,27 @@ The format of the restclient mode buffer takes inspiration from
 - [IntelliJ: HTTP request syntax﻿](https://www.jetbrains.com/help/idea/exploring-http-syntax.html)
 - [Visual Studio 2022: .http files syntax](https://learn.microsoft.com/en-us/aspnet/core/test/http-files?view=aspnetcore-9.0#http-file-syntax)
 
+# Table of Contents #
+
+* [Usage](#usage)
+* [In-buffer variables](#in-buffer-variables)
+* [Environment files](#environment-files)
+* [File uploads](#file-uploads)
+* [Customization](#customization)
+* [Known issues](#known-issues)
+* [History](#history)
+* [Related 3rd party packages](#related-3rd-party-packages)
+* [License](#license)
+* [Author](#author)
+
+
 # Usage
 
 You can easily install `restclient-mode` using `use-package`. Clone
 the repository into your `site-lisp` directory and add the following
 snippet
 
-```
+``` emacs-lisp
 (use-package restclient-mode
   	:load-path "site-lisp/restclient-mode")
 ```

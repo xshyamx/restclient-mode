@@ -682,9 +682,10 @@ Content-Type header. If no charset is specified, default to UTF-8."
 
 (defun restclient-set-var (var-name value)
   (restclient-remove-var var-name)
-  (setq restclient-var-overrides
-	(cons (cons var-name value)
-	      restclient-var-overrides)))
+  (unless (null value)
+    (setq restclient-var-overrides
+	  (cons (cons var-name value)
+		restclient-var-overrides))))
 
 (defun restclient-get-var-at-point (var-name buffer-name buffer-pos)
   (let* ((vars-at-point

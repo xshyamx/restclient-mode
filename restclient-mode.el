@@ -968,7 +968,9 @@ prompt user for `restclient-env-selected'"
       (if (and
 	   (file-exists-p file)
 	   (not (file-directory-p file)))
-	  (setq-local restclient-env-file (expand-file-name file))
+	  ;; force environment selection if file is changed
+	  (setq-local restclient-env-file (expand-file-name file)
+		      restclient-env-selected nil)
 	(user-error "Failed to find environment file: %s" file))))
 
   ;; load environment file
@@ -981,7 +983,8 @@ prompt user for `restclient-env-selected'"
 		(restclient-load-env-file restclient-env-file)))
 
   ;; select environment
-  (unless restclient-env-selected
+  (when (or force-env
+	    (not restclient-env-selected))
     (let ((en (restclient--get-env-names restclient-env-loaded)))
       (cond
        ((eq (length en) 1)
@@ -1057,9 +1060,16 @@ conventions"
     (restclient-set-env t)))
 
 (defun restclient-change-env ()
-  "Change the `restclient-env-selected'"
+  "Change the `restclient-env-file' and `restclient-env-selected'
+ie. change to a new environment file and environment"
   (interactive)
   (restclient-set-env nil t nil))
+
+(defun restclient-switch-env ()
+  "Change the `restclient-env-selected' ie. switch to a different
+environment specified in the currently loaded environment from
+`restclient-env-file'"
+  (interactive))
 
 (defun restclient-unload-env ()
   "Unload the current environment. Which translates to removing
@@ -1254,9 +1264,9 @@ jumps backwards"
 (defvar restclient-env-mode-map
   (let ((map (make-sparse-keymap)))
     (keymap-set map "r" #'restclient-reload-current-env)
-    (keymap-set map "e" #'restclient-change-env)
+    (keymap-set map "e" #'restclient-switch-env)
     (keymap-set map "u" #'restclient-unload-env)
-    (keymap-set map "l" #'restclient-load-env-file)
+    (keymap-set map "l" #'restclient-change-env)
     (keymap-set map "f" #'restclient-find-env-file)
     (keymap-set map "d" #'restclient-unload-dynamic-vars)
     map)

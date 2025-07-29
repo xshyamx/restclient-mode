@@ -22,6 +22,7 @@
 (require 'json)
 (require 'outline)
 (require 'restclient-variables)
+(require 'restclient-edit)
 (eval-when-compile (require 'subr-x))
 (eval-when-compile
   (if (version< emacs-version "26")
@@ -1063,13 +1064,14 @@ conventions"
   "Change the `restclient-env-file' and `restclient-env-selected'
 ie. change to a new environment file and environment"
   (interactive)
-  (restclient-set-env nil t nil))
+  (restclient-set-env nil t t))
 
 (defun restclient-switch-env ()
   "Change the `restclient-env-selected' ie. switch to a different
 environment specified in the currently loaded environment from
 `restclient-env-file'"
-  (interactive))
+  (interactive)
+  (restclient-set-env nil t nil))
 
 (defun restclient-unload-env ()
   "Unload the current environment. Which translates to removing
@@ -1286,6 +1288,7 @@ jumps backwards"
     (keymap-set map "C-c n n" #'restclient-narrow-to-current)
     (keymap-set map "C-c C-i" #'restclient-show-info)
     (keymap-set map "C-c i" #'restclient-insert-request)
+    (keymap-set map "C-c '" #'restclient-edit-indirect)
     (keymap-set map "C-c e" restclient-env-mode-map)
     map)
   "Keymap for restclient-mode.")

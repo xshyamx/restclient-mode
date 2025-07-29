@@ -60,9 +60,10 @@ and supports a few additional keypresses:
 | `TAB` | hide/show current request body |
 | `C-c C-a` | Show all collapsed regions |
 | `C-c C-i` | Show information on restclient variables at point |
+| `C-c '` | Edit hook expression in emacs-lisp buffer (similar to edit-indirect / org src edit) |
 | `C-c e` | Environment prefix |
-| `C-c e e` | Select environment file & environment |
-| `C-c e l` | Load a new environment file  |
+| `C-c e e` | Switch environment from current environment file (Selects environment file if not present) |
+| `C-c e l` | Load a new environment file and environment  |
 | `C-c e r` | Reload current environment file to refresh environment |
 | `C-c e u` | Unload current environment |
 | `C-c e f` | Open the current environment file |

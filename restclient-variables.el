@@ -1,9 +1,11 @@
 ;;; restclient-variables.el --- Reslove restclient variables  -*- lexical-binding: t; -*-
 
 ;; Author: shyam
+
 ;;; Commentary:
 
-;;
+;; Resolve variables by making multiple passes till there are no
+;; placeholders left or exceed `restclient-var-max-passes'
 
 ;;; Code:
 

@@ -813,27 +813,23 @@ eg. '((\"name\" . \"value\"))"
 		   (restclient-request-entity request)
 		   args)))))))
 
+(defun restclient--curl-command (method url headers entity)
+  (let ((lines (list (format "curl -i -X%s" method))))
+    (dolist (header headers)
+      (push (format "  -H \"%s: %s\"" (car header) (cdr header)) lines))
+    (when (and entity
+	       (> (string-width entity) 0))
+      (push (format "  -d \"%s\""  (replace-regexp-in-string "\"" "\\\\\"" entity)) lines))
+    (kill-new (concat (string-join (reverse lines) " \\\n")
+		      " \\\n  " url))
+    (message "curl command copied to clipboard")))
+
 (defun restclient-copy-curl-command ()
   "Formats the request as a curl command and copies the command to the
 clipboard."
   (interactive)
   (restclient-http-parse-current-and-do
-   '(lambda (method url headers entity)
-      (let ((header-args
-	     (apply 'append
-		    (mapcar (lambda (header)
-			      (list "-H" (format "%s: %s" (car header) (cdr header))))
-			    headers))))
-        (kill-new (concat "curl "
-                          (mapconcat 'shell-quote-argument
-                                     (append '("-i")
-                                             header-args
-                                             (list (concat "-X" method))
-                                             (list url)
-                                             (when (> (string-width entity) 0)
-                                               (list "-d" entity)))
-                                     " "))))
-      (message "curl command copied to clipboard."))))
+   #'restclient--curl-command))
 
 (defun restclient-elisp-result-function (args offset)
   (goto-char offset)

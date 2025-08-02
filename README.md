@@ -254,7 +254,7 @@ per-request hooks
 ``` sh
 # set a variable my-ip to the value of your ip address using elisp evaluated in the result buffer
 GET http://httpbin.org/ip
--> run-hook (restclient-set-var "my-ip" (cdr (assq 'origin (json-read))))
+-> on-response (restclient-set-var "my-ip" (cdr (assq 'origin (json-read))))
 
 # same thing with jq if it's installed
 GET http://httpbin.org/ip
@@ -380,6 +380,7 @@ your liking. Also, all font lock faces are now customizable in
 | restclient-response-buffer-name | `*HTTP Response*` | Name for response buffer to be used when `restclient-same-buffer-response` is true. |
 | restclient-inhibit-cookies | `nil` | Inhibit restclient from sending cookies implicitly. |
 | restclient-response-size-threshold | 100000 | Size of the response buffer restclient can display without huge performance dropdown.  If response buffer will be more than that, only bare major mode will be used to display it.  Set to `nil` to disable threshold completely. |
+| restclient-multi-line-curl | t | Copy request as a mult-line curl command. Set to  `nil` to generate a single line curl command (for eg. in Windows) |
 
 # Known issues
 

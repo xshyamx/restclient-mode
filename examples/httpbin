@@ -222,6 +222,7 @@ Content-type: text/plain
 
 # Test for issue #121
 POST http://httpbin.org/post?q=json
+Content-Type: application/json
 
 {"json": "that looks like header"}
 ###

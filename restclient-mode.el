@@ -646,6 +646,13 @@ Content-Type header. If no charset is specified, default to UTF-8."
       (comment-region start headers-end))
     (restclient-parse-headers headers-string)))
 
+(defun restclient-encode-params (params)
+  "Encode query/form parameters where PARAMS is a list of name value pairs
+eg. '((\"name\" . \"value\"))"
+  (mapconcat
+   (lambda (p) (concat (url-hexify-string (car p)) "=" (url-hexify-string (cdr p))))
+   params
+   "&"))
 
 (defun restclient-set-var-from-header (var header)
   (let* ((headers (restclient-get-response-headers))

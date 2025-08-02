@@ -223,11 +223,15 @@ POST http://httpbin.org/post?q=json
 {"json": "that looks like header"}
 ###
 
+@form-payload := (let ((params '((some . 1)
+		(params . "with weird/unusual")
+		("values[]" . "included!"))))
+  (restclient-encode-params params))
 # Form submit
 POST /post?q=form
 Content-Type: application/x-www-form-urlencoded
 
-one=1&two=34
+{{form-payload}}
 ###
 
 # Resolve variables in file upload

@@ -88,6 +88,9 @@ GET http://httpbin.org/status/404
 GET http://httpbin.org/status/200
 ###
 
+GET /status/204
+###
+
 # Returns given response headers.
 GET http://httpbin.org/response-headers?key=val
 ###

@@ -517,6 +517,12 @@ The buffer contains the raw HTTP response sent by the server."
       (signal (car (plist-get status :error))
 	      (cdr (plist-get status :error)))
     (when (buffer-live-p (current-buffer))
+      (let ((http-response-status
+	     (save-excursion
+	       (goto-char (point-min))
+	       (re-search-forward (rx bol "HTTP" (? "/1.1") (+ space) (group (* any)) eol))
+	       (match-string-no-properties 1))))
+	(message (or http-response-status "Complete!")))
       (with-current-buffer (restclient-decode-response
                             (current-buffer)
                             bufname
@@ -526,7 +532,6 @@ The buffer contains the raw HTTP response sent by the server."
           (restclient-prettify-response method url))
         (buffer-enable-undo)
 	(restclient-response-mode)
-	(message "Complete!")
 	(make-local-variable 'restclient-buffer-name)
 	(setq restclient-buffer-name restclient-buffer)
         (run-hooks 'restclient-response-loaded-hook)
@@ -646,11 +651,13 @@ Content-Type header. If no charset is specified, default to UTF-8."
       (comment-region start headers-end))
     (restclient-parse-headers headers-string)))
 
+
 (defun restclient-encode-params (params)
   "Encode query/form parameters where PARAMS is a list of name value pairs
 eg. '((\"name\" . \"value\"))"
   (mapconcat
-   (lambda (p) (concat (url-hexify-string (car p)) "=" (url-hexify-string (cdr p))))
+   (lambda (p) (concat (url-hexify-string (format "%s" (car p)))
+		  "=" (url-hexify-string (format "%s" (cdr p)))))
    params
    "&"))
 

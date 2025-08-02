@@ -153,7 +153,9 @@ POST http://httpbin.org/post
 # Variables
 #
 @auth-token = abcd1234
-@number := (+ 1 2 3 4)
+@number := <<
+(+ 1 2 3 4 5)
+#
 # still gets resolved
 @text := (concat "This is " "{{num" "ber}}")
 #

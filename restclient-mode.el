@@ -1251,6 +1251,7 @@ jumps backwards"
         (list restclient-evar-regexp '(1 'restclient-variable-name-face) '(2 'restclient-variable-elisp-face t))
         (list restclient-mvar-regexp '(1 'restclient-variable-name-face) '(2 'restclient-variable-multiline-face t))
         (list restclient-header-var-regexp '(1 'restclient-variable-usage-face))
+        (list (rx "{{" (+ (not "}")) "}}") '(0 'restclient-variable-usage-face))
         (list restclient-file-regexp '(0 'restclient-file-upload-face))
         (list restclient-header-regexp '(1 'restclient-header-name-face t) '(2 'restclient-header-value-face t))
 	(list restclient-response-hook-regexp '(1 ' restclient-request-hook-face t)

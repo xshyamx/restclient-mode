@@ -18,7 +18,7 @@ restclient buffer"
 	(sexp (buffer-local-value 'src-sexp (current-buffer)))
 	(s (buffer-string)))
     (when (and begin end buffer)
-      (kill-buffer (current-buffer))
+      (kill-buffer-and-window)
       ;; update only if there is a change
       (unless (string= s sexp)
 	(with-current-buffer buffer
@@ -32,7 +32,7 @@ restclient buffer"
   "Close the edit buffer without saving changes to the originating
 restclient buffer"
   (interactive)
-  (kill-buffer (current-buffer)))
+  (kill-buffer-and-window))
 
 (defun restclient-edit-indirect ()
   "Open new emacs-lisp buffer to edit s-expression associated with a hook

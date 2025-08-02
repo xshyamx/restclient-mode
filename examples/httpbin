@@ -6,7 +6,7 @@
 
 # Returns Origin IP.
 GET /ip
--> run-hook (restclient-set-var "origin" (alist-get 'origin (json-read-object)))
+-> on-response (restclient-set-var "origin" (alist-get 'origin (json-read-object)))
 
 ###
 
@@ -43,9 +43,9 @@ Content-Type: application/json
 
 # Content type is loosely matched, could be application/vnd.whatever+json
 GET http://httpbin.org/response-headers?Content-Type=application/vnd.whatever%2Bjson;%20charset=UTF-8
--> run-hook (message "dynamic hook called %s %s"
+-> on-response (message "dynamic hook called %s %s"
 (random ) (random ))
--> run-hook (message "another hook")
+-> on-response (message "another hook")
 ###
 
 
@@ -252,7 +252,7 @@ Cookie: {{cookie}}
 
 # multi-line elisp expression called on completion
 GET /response-headers?Content-Type=application/vnd.whatever%2Bjson;%20charset=UTF-8
--> run-hook (message "dynamic hook called %s %s"
+-> on-response (message "dynamic hook called %s %s"
                   (random ) (random ))
 ###
 
@@ -263,8 +263,8 @@ GET http://httpbin.org/ip
 
 # multiple elsip hooks on call
 GET /response-headers?Content-Type=application/vnd.whatever%2Bjson;%20charset=UTF-8
--> run-hook (message "hook 1")
--> run-hook (message "hook 2")
+-> on-response (message "hook 1")
+-> on-response (message "hook 2")
 ###
 
 # set basic auth from vars & referencing vars in hooks
@@ -274,13 +274,13 @@ GET /response-headers?Content-Type=application/vnd.whatever%2Bjson;%20charset=UT
 @auth-token :=  (format "Basic %s" (base64-encode-string "{{test-me}}"))
 GET /basic-auth/jack/secret
 Authorization: {{auth-token}}
--> run-hook (message (format "authenticated with '%s'" (restclient-get-var "auth-token")))
+-> on-response (message (format "authenticated with '%s'" (restclient-get-var "auth-token")))
 ###
 
 # saving header like csrf token for future usage
 @token := (random)
 POST /response-headers?X-CSRF-Token={{token}}
--> run-hook (restclient-set-var-from-header "csrftoken" "X-CSRF-Token")
+-> on-response (restclient-set-var-from-header "csrftoken" "X-CSRF-Token")
 ###
 
 # use save header
@@ -300,7 +300,7 @@ POST /response-headers?X-Custom-Id=one
 # override base-uri
 @base-uri = http://localhost:8080
 GET /json
--> run-hook (when-let (obj (json-read-object))
+-> on-response (when-let (obj (json-read-object))
    		(restclient-set-var "json" (json-encode obj)))
 
 ###
@@ -318,7 +318,7 @@ GET /image/jpeg
 
 # do not send body for GET
 GET /uuid
--> run-hook (restclient-set-var "uuid" (alist-get 'uuid (json-read-object)))
+-> on-response (restclient-set-var "uuid" (alist-get 'uuid (json-read-object)))
 Content-Type: application/json
 
 { "one": 1}

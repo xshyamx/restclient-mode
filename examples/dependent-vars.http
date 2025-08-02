@@ -17,5 +17,5 @@ to fetch a pail of water
 GET /basic-auth/jack/secret
 {{headers}}
 
--> run-hook (message (format "authenticated with '%s'" (restclient-get-var "auth-token")))
+-> on-response (message (format "authenticated with '%s'" (restclient-get-var "auth-token")))
 ###

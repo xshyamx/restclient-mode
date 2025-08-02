@@ -43,7 +43,7 @@ and save back to the restclient buffer"
 	(src-buf (current-buffer))
 	(regexp (rx bol
 		    (or (seq "->" (+ space)
-			     (group (or "pre-request" "run-hook"))
+			     (group (or "pre-request" "on-response"))
 			     (+ space)
 			     (group "(" (* any)))
 			(seq "@" (group (or alpha "_")

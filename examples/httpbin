@@ -316,6 +316,10 @@ Content-Type: application/json
 GET /image/jpeg
 ###
 
+# do not send body for GET
 GET /uuid
 -> run-hook (restclient-set-var "uuid" (alist-get 'uuid (json-read-object)))
+Content-Type: application/json
+
+{ "one": 1}
 ###

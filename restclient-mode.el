@@ -249,6 +249,10 @@ hanging if two variables reference each other directly or indirectly."
   '("GET" "POST" "PUT" "DELETE" "HEAD" "OPTIONS" "PATCH")
   "Support HTTP methods")
 
+(defconst restclient-no-body-methods
+  '("GET" "HEAD")
+  "HTTP methods where body must not be sent")
+
 (defconst restclient-method-url-regexp
   (rx-to-string `(: bol
 		    (group (or ,@restclient-http-methods))
@@ -369,7 +373,9 @@ hanging if two variables reference each other directly or indirectly."
 	       method url headers entity))
   (let ((url-request-method (encode-coding-string method 'us-ascii))
         (url-request-extra-headers '())
-        (url-request-data (encode-coding-string entity 'utf-8))
+        (url-request-data (if (null entity)
+			      nil
+			    (encode-coding-string entity 'utf-8)))
         (url-mime-charset-string (url-mime-charset-string))
         (url-mime-language-string nil)
         (url-mime-encoding-string nil)
@@ -779,7 +785,9 @@ Content-Type header. If no charset is specified, default to UTF-8."
 			  :method method
 			  :url url
 			  :headers headers
-			  :entity entity)))
+			  :entity (if (member method restclient-no-body-methods)
+				      nil
+				    entity))))
 	    (dolist (pr restclient-pre-request-functions)
 	      (ignore-errors
 		(setq request

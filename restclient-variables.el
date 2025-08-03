@@ -17,26 +17,29 @@
 
 (defun restclient-resolve-string (string vars)
   (if vars
-      (with-temp-buffer
-	(insert string)
-	(let ((pass restclient-vars-max-passes)
-	      (continue t)
-	      (regex
-	       (rx-to-string
-		`(seq "{{"
-		      (group
-		       (or ,@(seq-filter
-			      #'identity (mapcar #'car vars))))
-		      "}}"))))
-	  (while (and continue (> pass 0))
-            (setq pass (- pass 1))
-	    (goto-char (point-min))
-	    (while (re-search-forward regex nil t)
-	      (let ((var (match-string-no-properties 1)))
-		(setq continue t)
-		(replace-match
-		 (alist-get var vars nil nil #'string=) t t)))))
-	(buffer-string))
+      ;; Running multiple passes on a temp buffer overrides the match
+      ;; data especially when resolving request bodies so, save match-data
+      (save-match-data
+	(with-temp-buffer
+	  (insert string)
+	  (let ((pass restclient-vars-max-passes)
+		(continue t)
+		(regex
+		 (rx-to-string
+		  `(seq "{{"
+			(group
+			 (or ,@(seq-filter
+				#'identity (mapcar #'car vars))))
+			"}}"))))
+	    (while (and continue (> pass 0))
+              (setq pass (- pass 1))
+	      (goto-char (point-min))
+	      (while (re-search-forward regex nil t)
+		(let ((var (match-string-no-properties 1)))
+		  (setq continue t)
+		  (replace-match
+		   (alist-get var vars nil nil #'string=) t t)))))
+	  (buffer-string)))
     string))
 
 (defun restclient--find-dependencies (string)

@@ -611,7 +611,7 @@ Content-Type header. If no charset is specified, default to UTF-8."
 (defun restclient-current-max ()
   (save-excursion
     (if (re-search-forward
-	 restclient-comment-start-regexp (point-max) t)
+	 restclient-request-end-regexp (point-max) t)
         (max (- (point-at-bol) 1) 1)
       (progn (goto-char (point-max))
              (if (looking-at "^$") (- (point) 1) (point))))))
@@ -677,19 +677,31 @@ eg. '((\"name\" . \"value\"))"
     (insert-file-contents (expand-file-name path))
     (buffer-string)))
 
-(defun restclient-parse-body (entity vars)
-  (if (string-match restclient-file-regexp entity)
-      (let ((resolve-payload (string= ":" (match-string 1 entity)))
+(defun restclient--include-files (entity vars)
+  "Expand included files in ENTITY using VARS to resolve variable
+references within files if specified"
+  (with-temp-buffer
+    (insert entity)
+    (goto-char (point-min))
+    (while (re-search-forward restclient-file-regexp nil t)
+      (let ((resolve-payload (string= ":" (match-string 1)))
 	    (filename (restclient-resolve-string
-		       (match-string 2 entity)
+		       (match-string 2)
 		       vars)))
 	(if-let ((contents (and (file-exists-p filename)
 				(restclient-read-file filename))))
-	    (if resolve-payload
-		(restclient-resolve-string contents vars)
-	      contents)
-	  (user-error "File not found: %s" filename)))
-    (restclient-resolve-string entity vars)))
+	    (replace-match
+	     (if resolve-payload
+		 (restclient-resolve-string contents vars)
+	       contents)
+	     t t)
+	  (user-error "File not found: %s" filename))))
+    (buffer-string)))
+
+(defun restclient-parse-body (entity vars)
+  "Return request body including any files specified in the ENTITY. Resolve
+variable references using VARS in the result"
+  (restclient-resolve-string (restclient--include-files entity vars) vars))
 
 (defun restclient-parse-hook (cb-type args-offset args)
   (if-let ((handler (assoc cb-type restclient-result-handlers)))
@@ -746,7 +758,7 @@ eg. '((\"name\" . \"value\"))"
        begin
      (restclient-jump-next)))
   (save-excursion
-    (when (re-search-forward restclient-method-url-regexp (point-max) t)
+    (when (re-search-forward restclient-method-url-regexp (restclient-current-max) t)
       (let ((method (match-string-no-properties 1))
             (url (string-trim (match-string-no-properties 2)))
             (vars (restclient-find-vars-in-region (point-min) (point)))
@@ -787,7 +799,7 @@ eg. '((\"name\" . \"value\"))"
 		    'restclient-single-request-function))
         (let* ((cmax (restclient-current-max))
                (entity (restclient-parse-body
-			(buffer-substring (min (point) cmax) cmax) vars))
+			(buffer-substring-no-properties (min (point) cmax) cmax) vars))
                (url (restclient-resolve-string url vars)))
 	  (unless (or (string-prefix-p "http://" url)
 		      (string-prefix-p "https://" url))

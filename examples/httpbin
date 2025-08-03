@@ -331,3 +331,23 @@ Content-Type: application/json
 
 { "one": 1}
 ###
+
+# multipart request
+# Note:
+# * The boundary must be prefixed with `--` for all multi-parts
+# * The last boundary must be prefixed & suffixed with `--`
+@boundary := (org-id-uuid)
+POST /post
+Content-Type: multipart/form-data; boundary={{boundary}}
+
+--{{boundary}}
+Content-Disposition: form-data; name="number"
+
+100
+--{{boundary}}
+Content-Disposition: form-data; name="first"; filename="input.json"
+Content-Type: application/json; charset=utf-8
+
+<: ./with-vars.json
+--{{boundary}}--
+###

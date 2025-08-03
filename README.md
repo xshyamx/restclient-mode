@@ -335,6 +335,35 @@ Content-type: application/json
 <: with-vars.json
 ```
 
+Multi-part file uploads are supported but, the request needs to be constructed explicitly with a boundary eg.
+
+```
+@boundary := (random)
+POST http://httpbin.org/post
+Content-Type: multipart/form-data; boundary={{boundary}}
+
+--{{boundary}}
+Content-Disposition: form-data; name="number"
+
+100
+--{{boundary}}
+Content-Disposition: form-data; name="company"
+
+{{company}}
+--{{boundary}}
+Content-Disposition: form-data; name="first"; filename="input.json"
+Content-Type: application/json; charset=utf-8
+
+<: ./with-vars.json
+--{{boundary}}--
+###
+```
+
+**Note:**
+* The boundary must be prefixed with `--` for all parts
+* The last boundary must be prefixed & suffixed with `--`
+
+
 ### Caveats:
 
 - Multiline variables can be used in headers or body. In URL too, but

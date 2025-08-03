@@ -334,10 +334,10 @@ Content-Type: application/json
 
 # multipart request
 # Note:
-# * The boundary must be prefixed with `--` for all multi-parts
+# * The boundary must be prefixed with `--` for all parts
 # * The last boundary must be prefixed & suffixed with `--`
 @boundary := (org-id-uuid)
-POST /post
+POST /post?q=multipart
 Content-Type: multipart/form-data; boundary={{boundary}}
 
 --{{boundary}}

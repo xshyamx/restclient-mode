@@ -90,6 +90,12 @@
   :group 'restclient
   :type 'string)
 
+(defcustom restclient-multi-line-curl t
+  "Copy request as a muli-line curl command if `nil' it will be a single
+line"
+  :group 'restclient
+  :type 'boolean)
+
 (defgroup restclient-faces nil
   "Faces used in Restclient Mode"
   :group 'restclient
@@ -814,14 +820,20 @@ eg. '((\"name\" . \"value\"))"
 		   args)))))))
 
 (defun restclient--curl-command (method url headers entity)
-  (let ((lines (list (format "curl -i -X%s" method))))
+  (let ((multi-line-prefix (if restclient-multi-line-curl "  " ""))
+	(lines (list (format "curl -i -X%s" method))))
     (dolist (header headers)
-      (push (format "  -H \"%s: %s\"" (car header) (cdr header)) lines))
+      (push (format "%s-H \"%s: %s\"" multi-line-prefix (car header) (cdr header)) lines))
     (when (and entity
 	       (> (string-width entity) 0))
-      (push (format "  -d \"%s\""  (replace-regexp-in-string "\"" "\\\\\"" entity)) lines))
-    (kill-new (concat (string-join (reverse lines) " \\\n")
-		      " \\\n  " url))
+      (push (format "%s-d \"%s\""
+		    multi-line-prefix  (replace-regexp-in-string "\"" "\\\\\"" entity))
+	    lines))
+    (kill-new (concat (string-join
+		       (reverse lines)
+		       (if restclient-multi-line-curl " \\\n" " "))
+		      (if restclient-multi-line-curl " \\\n" " ")
+		      multi-line-prefix url))
     (message "curl command copied to clipboard")))
 
 (defun restclient-copy-curl-command ()

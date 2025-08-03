@@ -413,10 +413,6 @@ your liking. Also, all font lock faces are now customizable in
 
 # Known issues
 
-- Comment lines `#` act as end of entity. Yes, that means you can't
-  post shell script or anything with hashes as PUT/POST entity. I'm
-  fine with this right now, but may use more unique separator in
-  future.
 - I'm not sure if it handles different encodings, I suspect it won't
   play well with anything non-ascii. I'm yet to figure it out.
 - Variable usages are not highlighted

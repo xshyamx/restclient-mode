@@ -336,14 +336,15 @@ Content-Type: application/json
 # Note:
 # * The boundary must be prefixed with `--` for all parts
 # * The last boundary must be prefixed & suffixed with `--`
+@color = #ffaabb
 @boundary := (org-id-uuid)
 POST /post?q=multipart
 Content-Type: multipart/form-data; boundary={{boundary}}
 
 --{{boundary}}
-Content-Disposition: form-data; name="number"
+Content-Disposition: form-data; name="color"
 
-100
+{{color}}
 --{{boundary}}
 Content-Disposition: form-data; name="first"; filename="input.json"
 Content-Type: application/json; charset=utf-8

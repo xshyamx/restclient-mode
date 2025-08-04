@@ -9,11 +9,28 @@
 
 ;;; Code:
 
-(defun restclient--var-regexp (vars)
+(defconst restclient-var-use-regexp
+  (rx (repeat 2 3 "{")
+      (group
+       (or alpha "_")
+       (*? (or alnum "-" "_")))
+      (repeat 2 3 "}"))
+  "Regexp to match variable use")
+
+(defun restclient--var-use-regexp (vars)
+  "Return variable use regexp with only variables from VARS"
   (rx-to-string
-   `(seq "{{"
+   `(seq (repeat 2 3 "{")
 	 (group (or ,@(seq-filter #'identity (mapcar #'car vars))))
-	 "}}")))
+	 (repeat 2 3 "}"))))
+
+(defun restclient--replacement (match val)
+  "Escape double quotes in VAL if variable name is enclosed between `{{{' &
+`}}}' otherwise return VAL"
+  (if (and (string-prefix-p "{{{" match)
+	   (string-suffix-p "}}}" match))
+      (replace-regexp-in-string "\"" "\\\"" val t t)
+    val))
 
 (defun restclient-resolve-string (string vars)
   (if vars
@@ -24,21 +41,20 @@
 	  (insert string)
 	  (let ((pass restclient-vars-max-passes)
 		(continue t)
-		(regex
-		 (rx-to-string
-		  `(seq "{{"
-			(group
-			 (or ,@(seq-filter
-				#'identity (mapcar #'car vars))))
-			"}}"))))
+		(regex (restclient--var-use-regexp vars)))
 	    (while (and continue (> pass 0))
               (setq pass (- pass 1))
+	      (setq continue nil)
 	      (goto-char (point-min))
 	      (while (re-search-forward regex nil t)
-		(let ((var (match-string-no-properties 1)))
+		(let ((var (match-string-no-properties 1))
+		      (val (alist-get (match-string-no-properties 1)
+				      vars nil nil #'string=)))
 		  (setq continue t)
 		  (replace-match
-		   (alist-get var vars nil nil #'string=) t t)))))
+		   (restclient--replacement
+		    (match-string-no-properties 0) val)
+		   t t)))))
 	  (buffer-string)))
     string))
 
@@ -54,12 +70,7 @@ Variables names follow the following rules
     (with-temp-buffer
       (insert string)
       (goto-char (point-min))
-      (while (re-search-forward
-	      (rx "{{" (group
-			(or alpha "_")
-			(*? (or alnum "-" "_")))
-		  "}}")
-	      nil t)
+      (while (re-search-forward restclient-var-use-regexp nil t)
 	(push (match-string-no-properties 1) deps)))
     (seq-uniq deps #'string=)))
 
@@ -67,11 +78,15 @@ Variables names follow the following rules
   (if vars
       (with-temp-buffer
 	(insert string)
-	(let ((regex (restclient--var-regexp vars)))
+	(let ((regex (restclient--var-use-regexp vars)))
 	  (goto-char (point-min))
 	  (while (re-search-forward regex nil t)
-	    (let ((var (match-string-no-properties 1)))
-	      (replace-match (alist-get var vars nil nil #'string=) t t))))
+	    (let ((var (match-string-no-properties 1))
+		  (val (alist-get (match-string-no-properties 1)
+				  vars nil nil #'string=)))
+	      (replace-match (restclient--replacement
+			      (match-string-no-properties 0) val)
+			     t t))))
 	(buffer-string))
     string))
 

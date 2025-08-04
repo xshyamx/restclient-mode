@@ -146,7 +146,7 @@ Declare variables within the buffer anywhere outside of a request by
 starting the line with `@`. For eg.
 
 ```
-@base-uri = https://httpbing.org
+@base-uri = https://httpbin.org
 ```
 
 Requests can use relative path provided that the `base-uri` variable
@@ -214,7 +214,9 @@ for request bodies.
 
 After the var is declared, you can use it in the URL, the header
 values and the body by enclosing the variable name between double
-curly braces `{{` & `}}`.
+curly braces `{{` & `}}`. If the value contains double quotes then
+they can be escaped by enclosing the variable name between triple
+curly braces `{{{` & `}}}`.
 
 ``` sh
 # Some generic vars
@@ -230,12 +232,16 @@ User-Agent: SomeApp/1.0
 
 @user-id = 7
 @the-name := (format "%s %s %d" 'Neo (md5 "The Chosen") (+ 100 1))
+@quote = "This is a quote" - me
 
-PUT http://localhost:4000/users/{{user-id}}/
+# note quote is enclosed in triple curly braces so that it is valid json
+POST http://httpbin.org/post?users={{user-id}}
 {{my-headers}}
 
-{ "name": ":the-name" }
+{ "name": "{{the-name}}", "quote": "{{{quote}}}" }
+###
 ```
+
 
 Variables will be resolved based on the dependency for eg.
 

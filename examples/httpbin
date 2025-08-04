@@ -352,3 +352,12 @@ Content-Type: application/json; charset=utf-8
 <: ./with-vars.json
 --{{boundary}}--
 ###
+
+@quote = "All who wander are not lost" - J. R. R. Tolkien
+
+@lquote := (downcase "{{{quote}}}")
+POST /post
+Content-Type: application/json
+
+{"quote": "{{{quote}}}"}
+###

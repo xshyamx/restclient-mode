@@ -684,17 +684,19 @@ references within files if specified"
     (insert entity)
     (goto-char (point-min))
     (while (re-search-forward restclient-file-regexp nil t)
-      (let ((resolve-payload (string= ":" (match-string 1)))
+      (let ((begin (match-beginning 0))
+	    (end (match-end 0))
+	    (resolve-payload (string= ":" (match-string 1)))
 	    (filename (restclient-resolve-string
 		       (match-string 2)
 		       vars)))
 	(if-let ((contents (and (file-exists-p filename)
 				(restclient-read-file filename))))
-	    (replace-match
-	     (if resolve-payload
-		 (restclient-resolve-string contents vars)
-	       contents)
-	     t t)
+	    (progn
+	      (delete-region begin end)
+	      (insert (if resolve-payload
+			  (restclient-resolve-string contents vars)
+			contents)))
 	  (user-error "File not found: %s" filename))))
     (buffer-string)))
 

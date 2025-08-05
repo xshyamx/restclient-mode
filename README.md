@@ -155,6 +155,7 @@ is defined in the buffer.
 ```
 @base-uri = http://httpbin.org
 GET /json
+###
 ```
 
 In the above example the request will be sent to
@@ -261,20 +262,24 @@ per-request hooks
 # set a variable my-ip to the value of your ip address using elisp evaluated in the result buffer
 GET http://httpbin.org/ip
 -> on-response (restclient-set-var "my-ip" (cdr (assq 'origin (json-read))))
+###
 
 # same thing with jq if it's installed
 GET http://httpbin.org/ip
 -> jq-set-var my-ip .origin
+###
 
 # set a variable :my-var using a more complex jq expression (requires jq-mode)
 GET https://httpbin.org/json
 -> jq-set-var my-var .slideshow.slides[0].title
+###
 
 # hooks come before the body on POST
 POST http://httpbin.org/post
 -> jq-set-var test .json.test
 
 {"test": "foo"}
+###
 ```
 
 # Environment files #
@@ -327,9 +332,10 @@ Restclient now allows to specify file path to use as a body, like this:
 
 ```
 POST http://httpbin.org/post
-Content-type: text/plain
+Content-type: text/xml
 
-< /etc/passwd
+< sample.xml
+###
 ```
 
 Use `<:` to replace variable placeholders in the file
@@ -339,6 +345,7 @@ POST http://httpbin.org/post
 Content-type: application/json
 
 <: with-vars.json
+###
 ```
 
 Multi-part file uploads are supported but, the request needs to be constructed explicitly with a boundary eg.

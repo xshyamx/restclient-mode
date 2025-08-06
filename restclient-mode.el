@@ -703,7 +703,7 @@ references within files if specified"
 (defun restclient-parse-body (entity vars)
   "Return request body including any files specified in the ENTITY. Resolve
 variable references using VARS in the result"
-  (restclient-resolve-string (restclient--include-files entity vars) vars))
+  (restclient--include-files (restclient-resolve-string entity vars) vars))
 
 (defun restclient-parse-hook (cb-type args-offset args)
   (if-let ((handler (assoc cb-type restclient-result-handlers)))

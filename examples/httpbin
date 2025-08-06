@@ -350,6 +350,11 @@ Content-Disposition: form-data; name="first"; filename="input.json"
 Content-Type: application/json; charset=utf-8
 
 <: ./with-vars.json
+--{{boundary}}
+Content-Disposition: form-data; name="second"; filename="input.xml"
+Content-Type: text/xml; charset=utf-8
+
+< sample.xml
 --{{boundary}}--
 ###
 

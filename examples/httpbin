@@ -11,20 +11,20 @@ GET /ip
 ###
 
 # Returns user-agent.
-GET http://httpbin.org/user-agent
+GET /user-agent
 User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:31.0) Gecko/20100101 Firefox/31.0
 ###
 
 # Returns header dict.
-GET http://httpbin.org/headers
+GET /headers
 ###
 
 # Returns GET data.
-GET http://httpbin.org/get?some=example&params=for&testing=restclient
+GET /get?some=example&params=for&testing=restclient
 ###
 
 # Returns POST data.
-POST http://httpbin.org/post
+POST /post
 Content-Type: application/json
 
 {
@@ -42,7 +42,7 @@ Content-Type: application/json
 
 
 # Content type is loosely matched, could be application/vnd.whatever+json
-GET http://httpbin.org/response-headers?Content-Type=application/vnd.whatever%2Bjson;%20charset=UTF-8
+GET /response-headers?Content-Type=application/vnd.whatever%2Bjson;%20charset=UTF-8
 -> on-response (message "dynamic hook called %s %s"
 (random ) (random ))
 -> on-response (message "another hook")
@@ -50,11 +50,11 @@ GET http://httpbin.org/response-headers?Content-Type=application/vnd.whatever%2B
 
 
 # Content type is loosely matched, could be application/vnd.whatever+json
-GET http://httpbin.org/response-headers?Content-Type=application/something%2Bjson
+GET /response-headers?Content-Type=application/something%2Bjson
 ###
 
 # Returns PUT data.
-PUT http://httpbin.org/put
+PUT /put
 Content-Type: application/json
 
 {
@@ -64,7 +64,7 @@ Content-Type: application/json
 ###
 
 # Returns PATCH data.
-PATCH http://httpbin.org/patch
+PATCH /patch
 Content-Type: application/json
 
 [
@@ -76,42 +76,42 @@ Content-Type: application/json
 ###
 
 # Returns DELETE data
-DELETE http://httpbin.org/delete
+DELETE /delete
 If-Match: "*"
 ###
 
 # HTTP Status codes
 # 404
-GET http://httpbin.org/status/404
+GET /status/404
 ###
 # 200
-GET http://httpbin.org/status/200
+GET /status/200
 ###
 
 GET /status/204
 ###
 
 # Returns given response headers.
-GET http://httpbin.org/response-headers?key=val
+GET /response-headers?key=val
 ###
 
 # cookie data.
-GET http://httpbin.org/cookies
+GET /cookies
 Cookie: name=restclient
 ###
 
 # HTTPBasic Auth.
 @example-auth := (format "Basic %s" (base64-encode-string (format "%s:%s" "user" "password")))
-GET http://httpbin.org/basic-auth/user/password
+GET /basic-auth/user/password
 Authorization: {{example-auth}}
 ###
 
 # Returns some XML
-GET http://httpbin.org/xml
+GET /xml
 ###
 
 # Test for unicode
-PUT http://httpbin.org/put
+PUT /put
 Content-Type: application/json
 
 {
@@ -124,11 +124,11 @@ GET http://localhost:3000
 ###
 
 # Magic mode matching test
-GET http://httpbin.org/response-headers?Content-Type=whatever/braindamage
+GET /response-headers?Content-Type=whatever/braindamage
 ###
 
 # UTF-8 encoding test
-PUT http://httpbin.org/put
+PUT /put
 Content-Type: application/json
 
 {
@@ -139,7 +139,7 @@ Content-Type: application/json
 ###
 
 #
-POST http://httpbin.org/post?one={{number}}
+POST /post?one={{number}}
 Content-Type: application/x-www-form-urlencoded
 
 pwd=1234&name={{company}}
@@ -147,7 +147,7 @@ pwd=1234&name={{company}}
 
 #
 @foo = foo\bar
-POST http://httpbin.org/post
+POST /post
 
 {{foo}}
 ###
@@ -183,7 +183,7 @@ POST /post?q=1
 {{common-body}}
 ###
 # ...and another example
-POST http://httpbin.org/post?q=2
+POST /post?q=2
 {{common-headers}}
 
 {
@@ -214,14 +214,14 @@ POST /post?q=4
 ###
 
 # File upload
-PUT http://httpbin.org/put
+PUT /put
 Content-type: text/plain
 
 < env.json
 ###
 
 # Test for issue #121
-POST http://httpbin.org/post?q=json
+POST /post?q=json
 Content-Type: application/json
 
 {"json": "that looks like header"}
@@ -240,18 +240,18 @@ Content-Type: application/x-www-form-urlencoded
 
 # Resolve variables in file upload
 @filename = sample.xml
-POST http://httpbin.org/post
+POST /post
 Content-Type: text/xml
 
 <: {{filename}}
 ###
 
 #
-GET http://httpbin.org/redirect-to?url=http%3A%2F%2Fexample.com%2F
+GET /redirect-to?url=http%3A%2F%2Fexample.com%2F
 ###
 
 @cookie=B=db9s6bpclha4g&b=3&s=eq
-POST http://httpbin.org/post
+POST /post
 Cookie: {{cookie}}
 ###
 
@@ -265,7 +265,7 @@ GET /response-headers?Content-Type=application/vnd.whatever%2Bjson;%20charset=UT
 ###
 
 # set a variable to the value of your ip address using a jq expression
-GET http://httpbin.org/ip
+GET /ip
 -> jq-set-var my-ip .origin
 ###
 

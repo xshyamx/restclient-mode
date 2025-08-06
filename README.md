@@ -269,7 +269,7 @@ GET http://httpbin.org/ip
 -> jq-set-var my-ip .origin
 ###
 
-# set a variable :my-var using a more complex jq expression (requires jq-mode)
+# set a variable my-var using a more complex jq expression (requires jq-mode)
 GET https://httpbin.org/json
 -> jq-set-var my-var .slideshow.slides[0].title
 ###

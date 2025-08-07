@@ -22,7 +22,6 @@ The format of the restclient mode buffer takes inspiration from
 * [File uploads](#file-uploads)
 * [Customization](#customization)
 * [Known issues](#known-issues)
-* [History](#history)
 * [Related 3rd party packages](#related-3rd-party-packages)
 * [License](#license)
 * [Author](#author)

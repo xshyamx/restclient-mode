@@ -944,14 +944,16 @@ clipboard."
 
 (restclient-register-result-func
  "on-response" #'restclient-elisp-result-function
- "Call the provided (possibly multi-line) elisp when the result
-  buffer is formatted. Equivalent to a restclient-response-loaded-hook
-  that only runs for this request.
+ "Call the provided (possibly multi-line) elisp when
+  the result buffer is formatted. Equivalent to a
+  `restclient-response-loaded-hook' that only runs
+  for this request.
   eg. -> on-response (message \"my hook called\")" )
 
 (restclient-register-result-func
  "pre-request" #'restclient-elisp-request-function
- "Call the provided (possibly multi-line) elisp before the request is sent")
+ "Call the provided (possibly multi-line) elisp
+  before the request is sent")
 
 (defun restclient-elisp-request-function (args offset)
   (goto-char offset)

@@ -77,7 +77,7 @@ ARGS contains the variable name and a jq pattern to use."
  "jq-set-var" #'restclient-jq-json-var-function
  "Set a restclient variable with the value jq expression,
 takes var & jq expression as args.
-eg. -> jq-set-var :my-token .token")
+eg. -> jq-set-var my-token .token")
 (define-key restclient-response-mode-map  (kbd "C-c C-j") #'restclient-jq-interactive-result)
 
 (provide 'restclient-jq)

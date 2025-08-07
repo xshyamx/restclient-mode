@@ -428,22 +428,11 @@ your liking. Also, all font lock faces are now customizable in
 
 - I'm not sure if it handles different encodings, I suspect it won't
   play well with anything non-ascii. I'm yet to figure it out.
-- Variable usages are not highlighted
 - If your Emacs is older than 26.1, some GET requests to `localhost`
   might fail because of that
   [bug](http://debbugs.gnu.org/cgi/bugreport.cgi?bug=17976) in
   Emacs/url.el. As a workaround you can use `127.0.0.1` instead of
   `localhost`.
-
-# History
-
-- _01/Aug/2016_ Added ability to narrow to region
-- _06/Apr/2016_ Helm sources for variables and requests added.
-- _06/Apr/2016_ File uploads! See upstairs for syntax.
-- _06/Apr/2016_ Added customizable faces for all syntax highlighting, so it can be used in themes.
-- _05/Apr/2016_ Added ability to declare multi-line variables (e.g. set of headers repeated for each request) and substitute variable values recursively.
-- _25/Mar/2015_ Chop last newline from request body. If you really need to send one, just add one more, otherwise url-encoded POSTs will fail.
-- _15/Jun/2013_ Added support for variables.
 
 # Related 3rd party packages
 

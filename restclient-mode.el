@@ -169,6 +169,30 @@ other text)."
   :group 'restclient-faces)
 
 
+(defvar restclient-menu-contents
+  '("Restclient"
+    ["Send request" restclient-http-send-current-stay-in-window
+     :help "Send request staying in request buffer"]
+    ["Send request & switch" restclient-http-send-current
+     :help "Send request and switch to the response buffer"]
+    ["Send backround request" restclient-http-send-current-suppress-response-buffer
+     :help "Send request and do not display response buffer"]
+    ["Send request & raw response" restclient-http-send-current-raw
+     :help "Send request and do not process response buffer"]
+    "--"
+    ["Insert request" restclient-insert-request
+     :help "Insert new request"]
+    "--"
+    ["Switch Environment" restclient-switch-env
+     :help "Switch to a new environment"]
+    ["Open environment file" restclient-find-env-file
+     :help "Open current environment file"]
+    ["Change environment file" restclient-change-env
+     :help "Change the selected environment file"]
+    ["Reload current environment" restclient-reload-current-env
+     :help "Reload current environment"])
+  "Contents of the Resclient menu")
+
 (defvar restclient-within-call nil)
 
 (defvar restclient-request-time-start nil)
@@ -1356,6 +1380,11 @@ jumps backwards"
 		     (interactive)
 		     (quit-window (get-buffer-window (current-buffer))))))
   :group 'restclient)
+
+(easy-menu-define restclient-mode-menu
+  restclient-mode-map
+  "Menu for restclient-mode"
+  restclient-menu-contents)
 
 ;;;###autoload
 (define-derived-mode restclient-mode fundamental-mode

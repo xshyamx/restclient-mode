@@ -254,30 +254,37 @@ Authorization: Basic {{auth-digest}}
 #
 ```
 
-Variables can also be set based on the body of a response using the
-per-request hooks
+Variables can also be set based on the body or headers from a response
+using the per-request hooks
 
 ``` sh
-# set a variable my-ip to the value of your ip address using elisp evaluated in the result buffer
+# Set a variable my-ip to the value of your ip address using elisp
+# evaluated in the result buffer
 GET http://httpbin.org/ip
 -> on-response (restclient-set-var "my-ip" (cdr (assq 'origin (json-read))))
 ###
 
-# same thing with jq if it's installed
+# Same thing with jq if it's installed
 GET http://httpbin.org/ip
 -> jq-set-var my-ip .origin
 ###
 
-# set a variable my-var using a more complex jq expression (requires jq-mode)
+# Set a variable my-var using a more complex jq expression.
+# Requires jq-mode
 GET https://httpbin.org/json
 -> jq-set-var my-var .slideshow.slides[0].title
 ###
 
-# hooks come before the body on POST
+# Hooks come before the body on POST
 POST http://httpbin.org/post
 -> jq-set-var test .json.test
 
 {"test": "foo"}
+###
+
+# Set variable csrftoken from header value
+POST http://httpbin.org/response-headers?X-CSRF-Token={{token}}
+-> header-set-var csrftoken X-CSRF-Token
 ###
 ```
 

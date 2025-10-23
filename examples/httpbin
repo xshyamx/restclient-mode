@@ -288,7 +288,7 @@ Authorization: {{auth-token}}
 # saving header like csrf token for future usage
 @token := (random)
 POST /response-headers?X-CSRF-Token={{token}}
--> on-response (restclient-set-var-from-header "csrftoken" "X-CSRF-Token")
+-> header-set-var csrftoken X-CSRF-Token
 ###
 
 # use save header

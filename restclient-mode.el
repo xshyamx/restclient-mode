@@ -440,6 +440,28 @@ hanging if two variables reference each other directly or indirectly."
 			  handle-args)
 		  nil restclient-inhibit-cookies)))
 
+(defun restclient--extract-headers (content)
+  "Extract the headers as an alist from the CONTENT string containing the
+headers. Header names are converted to lowercase"
+  (let ((headers)
+	(regexp (rx bol (group (+ (not (or "\n" ":"))))
+		    ":" (+ space) (group (* any)) eol)))
+    (with-temp-buffer
+      (insert content)
+      (goto-char (point-min))
+      (while (re-search-forward
+	      regexp
+	      nil t)
+	(let ((key (downcase (match-string-no-properties 1)))
+	      (value (match-string-no-properties 2)))
+	  (setq kv (assoc key headers))
+	  (if kv
+	      (let ((new-val (append kv (list value))))
+		(setq headers (assoc-delete-all key headers))
+		(push new-val headers))
+	    (push (list key value) headers))))
+      headers)))
+
 (defun restclient-prettify-response (method url)
   (save-excursion
     (let ((start (point)) (guessed-mode) (end-of-headers))
@@ -525,7 +547,8 @@ hanging if two variables reference each other directly or indirectly."
               (insert method " " url "\n" headers)
               (insert (format "Request duration: %fs\n" (float-time (time-subtract restclient-request-time-end restclient-request-time-start))))
               (unless (member guessed-mode '(image-mode text-mode))
-		(comment-region hstart (point))))))))))
+		(comment-region hstart (point)))))
+	  (setq-local restclient-headers (restclient--extract-headers headers)))))))
 
 (defun restclient-prettify-json-unicode ()
   (save-excursion
@@ -659,29 +682,6 @@ Content-Type header. If no charset is specified, default to UTF-8."
             start (match-end 0)))
     headers))
 
-(defun restclient-get-response-headers ()
-  "Returns alist of current response headers"
-  (let* ((start restclient--header-start-position)
-	 (headers-end
-	  (1+ (or (string-match
-		   "\n\n"
-		   (buffer-substring-no-properties start (point-max)))
-		  (buffer-size))))
-	 (headers-commented-p (and (< 1 start) ;; catches raw response buffers
-				   (not (member major-mode '(image-mode text-mode)))))
-	 (headers-string (buffer-substring-no-properties start headers-end)))
-    (when headers-commented-p
-      ;; Temporarily uncomment to extract string
-      (uncomment-region start headers-end)
-      (setq headers-end (1+ (or (string-match
-				 "\n\n"
-				 (buffer-substring-no-properties start (point-max)))
-				(buffer-size)))
-	    headers-string (buffer-substring-no-properties start headers-end))
-      (comment-region start headers-end))
-    (restclient-parse-headers headers-string)))
-
-
 (defun restclient-encode-params (params)
   "Encode query/form parameters where PARAMS is a list of name value pairs
 eg. '((\"name\" . \"value\"))"
@@ -690,11 +690,6 @@ eg. '((\"name\" . \"value\"))"
 		  "=" (url-hexify-string (format "%s" (cdr p)))))
    params
    "&"))
-
-(defun restclient-set-var-from-header (var header)
-  (let* ((headers (restclient-get-response-headers))
-	 (val (restclient--get-var headers header)))
-    (restclient-set-var var val)))
 
 (defun restclient-read-file (path)
   (with-temp-buffer
@@ -887,17 +882,38 @@ clipboard."
 	(form (macroexpand-all (read (current-buffer)))))
     (lambda ()
       (eval form)
-      (let ((var-overrides (buffer-local-value
-			    'restclient-var-overrides (current-buffer))))
-	(with-current-buffer bufname
-	  ;; remove overriden keys from response buffer
-	  (dolist (var var-overrides)
-	    (setq-local restclient-var-overrides
-			(assoc-delete-all (car var) restclient-var-overrides)))
-	  ;; merge changes from response buffer to restclient buffer
-	  (setq-local
-	   restclient-var-overrides
-	   (append var-overrides restclient-var-overrides)))))))
+      (restclient--copy-variables bufname))))
+
+(defun restclient--copy-variables (buffer)
+  "Copy `restclient-var-overrides' from the current buffer to the buffer
+local variable of the same name in BUFFER"
+  (let ((var-overrides (buffer-local-value
+			'restclient-var-overrides (current-buffer))))
+    (with-current-buffer buffer
+      ;; remove overriden keys from response buffer
+      (dolist (var var-overrides)
+	(setq-local restclient-var-overrides
+		    (assoc-delete-all (car var) restclient-var-overrides)))
+      ;; merge changes from response buffer to restclient buffer
+      (setq-local
+       restclient-var-overrides
+       (append var-overrides restclient-var-overrides)))))
+
+(defun restclient-header-var-function (args _args-offset)
+  "A restclient result func for setting variables from a header.
+
+ARGS contains the variable name and a header name to use."
+  (save-match-data
+    (and (string-match "\\([[:word:]_-]+\\) \\(.*\\)$" args)
+         (let ((var-name (match-string 1 args))
+               (header (downcase (match-string 2 args)))
+	       (bufname (buffer-name (current-buffer))))
+           (lambda ()
+	     (when-let (header-val (restclient--get-var restclient-headers header))
+	       (restclient-set-var var-name (cond
+					     ((listp header-val) (string-join header-val " "))
+					     ((stringp header-val) header-val))))
+	     (restclient--copy-variables bufname))))))
 
 (defun restclient--select-method (table prompt &optional format)
   (let (allowed-keys rtn pressed formatter buffer (inhibit-quit t))
@@ -965,6 +981,12 @@ clipboard."
       (insert "\n###\n")
       (goto-char p))))
 
+
+(restclient-register-result-func
+ "header-set-var" #'restclient-header-var-function
+ "Set a restclient variable with the header value,
+takes variable & header name as args.
+eg. -> header-set-var csrfToken X-CSRF-Token")
 
 (restclient-register-result-func
  "on-response" #'restclient-elisp-result-function

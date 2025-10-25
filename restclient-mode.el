@@ -1234,7 +1234,7 @@ jumps backwards"
 	    "\n" "|\n| |"
 	    (replace-regexp-in-string
 	     "\|" "\\\\vert{}"
-	     (restclient-resolve-string  var-value vars-at-point))))
+	     var-value)))
 	 (var-row (var-name var-value)
 	   (insert "|" var-name "|" (sanitize-value-cell var-value) "|\n"))
 	 (var-table (table-name)

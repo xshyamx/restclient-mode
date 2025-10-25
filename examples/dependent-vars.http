@@ -1,5 +1,6 @@
 # -*- mode: restclient -*-
 # set basic auth from vars & referencing vars in hooks
+@base-uri = http://localhost:8080
 @non-existent = This is not {{there}}
 @headers = <<
 Content-Type: application/json

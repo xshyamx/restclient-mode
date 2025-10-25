@@ -59,7 +59,7 @@ and supports a few additional keypresses:
 | `C-c i` | Insert new request prompting for method |
 | `TAB` | hide/show current request body |
 | `C-c C-a` | Show all collapsed regions |
-| `C-c C-i` or `C-c TAB` | Show information on restclient variables at point |
+| `C-c C-i` or <br>`C-c TAB` | Show information on restclient variables at point |
 | `C-c '` | Edit hook expression or elisp variable in emacs-lisp buffer (similar to edit-indirect / org src edit) |
 | `C-c e` | Environment prefix |
 | `C-c e e` | Switch environment from current environment file (Selects environment file if not present) |

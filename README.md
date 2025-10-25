@@ -497,6 +497,7 @@ your liking. Also, all font lock faces are now customizable in
 - [company-restclient](https://github.com/iquiw/company-restclient): It provides auto-completion for HTTP methods and headers in restclient-mode. Completion source is given by know-your-http-well.
 - [ob-restclient](https://github.com/alf/ob-restclient.el): An extension to restclient.el for emacs that provides org-babel support.
 - [restclient.vim](https://github.com/bounceme/restclient.vim): Brings the restclient to vim! Responses display in vim's internal pager.
+- [resclient](https://github.com/emacsorphanage/restclient): Alternate fork of [restclient.el](https://github.com/pashky/restclient.el) with support for environments & saving responses. Available on [MELPA](https://melpa.org/#/restclient)
 
 # License
 

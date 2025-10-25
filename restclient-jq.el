@@ -47,7 +47,7 @@
          shell-command-switch
          (format "%s %s %s"
                  jq-interactive-command
-								 "-r"
+		 "-r"
                  (shell-quote-argument jq-pattern))))
       (string-trim (buffer-string)))))
 

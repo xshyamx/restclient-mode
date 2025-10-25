@@ -18,6 +18,7 @@ The format of the restclient mode buffer takes inspiration from
 
 * [Usage](#usage)
 * [In-buffer variables](#in-buffer-variables)
+* [Hooks](#hooks)
 * [Environment files](#environment-files)
 * [File uploads](#file-uploads)
 * [Customization](#customization)
@@ -286,6 +287,57 @@ POST http://httpbin.org/post
 POST http://httpbin.org/response-headers?X-CSRF-Token={{token}}
 -> header-set-var csrftoken X-CSRF-Token
 ###
+```
+
+# Hooks #
+
+There are some predefined hooks that can be used to set variables as
+seen above or execute some code to extract data from the response
+| Name | Value |
+|----|----|
+| pre-request | Call the provided elisp returning a `restclient-request`  before the request is sent. The original request is available as the variable `request` |
+| on-response | Call the provided elisp when the result buffer is formatted. The point is set to the beginning of the buffer before evaluation  |
+| header-set-var | Set a restclient variable with the header value, takes variable & header name as args. Multi-valued headers are joined together with a single space |
+| jq-set-var | Set a restclient variable with the value jq expression (`jq-interactive-command` must be set to execute jq), takes var & jq expression as args |
+
+
+```
+@base-uri = http://httpbin.org
+# pre-request
+# Calculate the sha-256 hash of the request entity and add it as a Content-Digest header.
+# The original request is available bound to the variable `request`
+POST /post?q=4
+-> pre-request (progn (setf (restclient-request-headers request)
+	     (append (list '("Content-Type" . "application/json")
+			   (cons "Content-Digest"
+				 (concat "sha-256=" (secure-hash 'sha256 (restclient-request-entity request )))))
+		     (restclient-request-headers request)))
+       request)
+<: with-vars.json
+###
+
+# on-response
+# Extract data from the response and set as a variable
+GET /uuid
+-> on-response (restclient-set-var "uuid" (alist-get 'uuid (json-read-object)))
+Content-Type: application/json
+
+{ "one": 1}
+###
+
+# header-set-var
+# Set a variable extracted from the header value
+POST /response-headers?Set-Cookie=one&Set-Cookie=two
+-> header-set-var cookie Set-Cookie
+###
+# cookie is set to "one two"
+
+# jq-set-var
+# set a variable to the value of your ip address using a jq expression
+GET /ip
+-> jq-set-var my-ip .origin
+###
+
 ```
 
 # Environment files #

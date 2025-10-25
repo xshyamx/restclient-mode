@@ -94,42 +94,20 @@ GET http://www.redmine.org/issues.xml?limit=10
 #
 GET http://upload.wikimedia.org/wikipedia/commons/6/63/Wikipedia-logo.png
 ###
-#
-# A bit of json GET, you can pass headers too
-#
-@base-uri = http://jira.atlassian.com/rest/api
+
 # use relative URIs by defining a `base-uri` variable
-GET /latest/issue/JRA-9
-User-Agent: Emacs24
-Accept-Encoding: compress, gzip
+@base-uri = http://httpbin.org
+GET /response-headers?Set-Cookie=one
 ###
 #
 # Post works too, entity just goes after an empty line. Same is for PUT.
 #
-POST /2/search
+POST /post?q=json
 Content-Type: application/json
 
-{
-        "jql": "project = HCPUB",
-        "startAt": 0,
-        "maxResults": 15,
-        "fields": [
-                "summary",
-                "status",
-                "assignee"
-        ]
-}
-###
-#
-# And delete, will return not-found error...
-#
-DELETE /2/version/20
+{"json": "that looks like header"}
 ###
 
-# Set a variable to the value of your ip address using a jq expression
-GET http://httpbin.org/ip
--> jq-set-var my-ip .origin
-###
 ```
 
 Lines starting with `#` are considered comments. Each request begins

@@ -396,6 +396,59 @@ hanging if two variables reference each other directly or indirectly."
   "HTTP Request to be passed to the `pre-request' hooks"
   method url headers entity)
 
+(defun restclient-parse-multipart-entity (part)
+  "Parse multipart fragment into headers & entity value"
+  (with-temp-buffer
+    (insert part)
+    (goto-char 0)
+    (let ((headers '()))
+      (while (cond
+              ((and (looking-at restclient-header-regexp)
+		    (not (looking-at restclient-empty-line-regexp)))
+               (setq headers
+		     (cons (restclient-make-header)
+			   headers))))
+        (forward-line))
+      (when (looking-at restclient-empty-line-regexp)
+        (forward-line))
+      (list :headers headers
+	    :entity (buffer-substring-no-properties (point) (point-max))))))
+
+(defun restclient--multipart-entity (boundary parts)
+  "Construct encoded multipart entity containing PARTS separated by
+BOUNDARY"
+  (with-temp-buffer
+    (let ((crlf "\r\n"))
+      (dolist (part parts)
+	(insert "--" boundary crlf)
+	(dolist (header (plist-get part :headers))
+	  (insert (car header) ": " (cdr header) crlf))
+	(insert crlf)
+	(insert (plist-get part :entity) crlf))
+      (insert "--" boundary "--" "\r\n"))
+    (buffer-string)))
+
+(defun restclient--multipart-handler (request)
+  "Pre-request handler to convert multipart entity separated by CRLFs"
+  (let ((headers (restclient-request-headers request))
+	(entity (restclient-request-entity request) )
+	(regexp (rx "multipart/form-data;"
+		    (+ space) "boundary=" (group (* any))))
+	(boundary))
+    (let ((content-type (restclient--get-var headers "Content-Type")))
+      (setq boundary
+	    (if (string-match regexp content-type)
+		(match-string-no-properties 1 content-type)
+	      nil)))
+    (when boundary
+      (let ((parts (mapcar #'restclient-parse-multipart-entity
+			   (butlast
+			    (split-string
+			     entity (concat "--" boundary) t "[\r\n]+")))))
+	(setf (restclient-request-entity request)
+	      (restclient--multipart-entity boundary parts))))
+    request))
+
 (defun restclient-http-do (method url headers entity &rest handle-args)
   "Send ENTITY and HEADERS to URL as a METHOD request."
   (if restclient-log-request
@@ -845,6 +898,8 @@ variable references using VARS in the result"
 	      (ignore-errors
 		(setq request
 		      (funcall pr request))))
+	    ;; handle multi-part request
+	    (setq request (restclient--multipart-handler request))
 	    (apply func
 		   (restclient-request-method request)
 		   (restclient-request-url request)

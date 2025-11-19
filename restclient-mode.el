@@ -435,7 +435,7 @@ BOUNDARY"
 	(regexp (rx "multipart/form-data;"
 		    (+ space) "boundary=" (group (* any))))
 	(boundary))
-    (let ((content-type (restclient--get-var headers "Content-Type")))
+    (when-let ((content-type (restclient--get-var headers "Content-Type")))
       (setq boundary
 	    (if (string-match regexp content-type)
 		(match-string-no-properties 1 content-type)

@@ -30,8 +30,8 @@ The format of the restclient mode buffer takes inspiration from
 
 # Usage
 
-You can easily install `restclient-mode` using `use-package`. Clone
-the repository into your `site-lisp` directory and add the following
+You can install `restclient-mode` using `use-package`. Clone the
+repository into your `site-lisp` directory and add the following
 snippet
 
 ``` emacs-lisp

@@ -9,20 +9,21 @@
 
 ;;; Code:
 
+
 (defconst restclient-var-use-regexp
-  (rx (repeat 2 3 "{")
-      (group
-       (or alpha "_")
-       (*? (or alnum "-" "_")))
-      (repeat 2 3 "}"))
+  (concat "\\({{{?\\)"
+	  "\\(" restclient-var-name-regexp  "\\)"
+	  "}}}?")
   "Regexp to match variable use")
 
 (defun restclient--var-use-regexp (vars)
-  "Return variable use regexp with only variables from VARS"
+  "Return variable use regexp with only variables from VARS. Variable name
+is match string 2 and beginning delimiter is 1"
+
   (rx-to-string
-   `(seq (repeat 2 3 "{")
+   `(seq (group "{{"(? "{"))
 	 (group (or ,@(seq-filter #'identity (mapcar #'car vars))))
-	 (repeat 2 3 "}"))))
+	 (group "}}"(? "}")))))
 
 (defun restclient--replacement (match val)
   "Escape double quotes in VAL if variable name is enclosed between `{{{' &
@@ -47,8 +48,8 @@
 	      (setq continue nil)
 	      (goto-char (point-min))
 	      (while (re-search-forward regex nil t)
-		(let ((var (match-string-no-properties 1))
-		      (val (alist-get (match-string-no-properties 1)
+		(let ((var (match-string-no-properties 2))
+		      (val (alist-get (match-string-no-properties 2)
 				      vars nil nil #'string=)))
 		  (setq continue t)
 		  (replace-match
@@ -81,8 +82,8 @@ Variables names follow the following rules
 	(let ((regex (restclient--var-use-regexp vars)))
 	  (goto-char (point-min))
 	  (while (re-search-forward regex nil t)
-	    (let ((var (match-string-no-properties 1))
-		  (val (alist-get (match-string-no-properties 1)
+	    (let ((var (match-string-no-properties 2))
+		  (val (alist-get (match-string-no-properties 2)
 				  vars nil nil #'string=)))
 	      (replace-match (restclient--replacement
 			      (match-string-no-properties 0) val)

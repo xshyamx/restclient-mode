@@ -48,7 +48,6 @@ GET /response-headers?Content-Type=application/vnd.whatever%2Bjson;%20charset=UT
 -> on-response (message "another hook")
 ###
 
-
 # Content type is loosely matched, could be application/vnd.whatever+json
 GET /response-headers?Content-Type=application/something%2Bjson
 ###
@@ -138,7 +137,7 @@ Content-Type: application/json
 }
 ###
 
-#
+# Form post
 POST /post?one={{number}}
 Content-Type: application/x-www-form-urlencoded
 
@@ -152,18 +151,18 @@ POST /post
 {{foo}}
 ###
 
-#
+
 # Variables
-#
+
 @auth-token = abcd1234
 @number := <<
 (+ 1 2 3 4 5)
 #
 # still gets resolved
 @text := (concat "This is " "{{num" "ber}}")
-#
+
 # Multiline variable referencing another variable
-#
+
 @my-ip = 123.1.1.1
 @common-headers = <<
 Authentication: {{auth-token}}
@@ -176,7 +175,7 @@ Content-type: application/json
 { "number": {{number}}, "text": "{{text}}" }
 #
 # Now, use them both in request
-#
+
 POST /post?q=1
 {{common-headers}}
 
@@ -190,8 +189,9 @@ POST /post?q=2
     "other": "body",
     "common": {{common-body}}
 }
+###
 
-### POST replacing variables in file
+# POST replacing variables in file
 POST /post?q=3
 Content-Type: application/json
 -> pre-request (make-restclient-request
@@ -202,7 +202,7 @@ Content-Type: application/json
 <: with-vars.json
 ###
 
-### POST
+# POST
 POST /post?q=4
 -> pre-request (progn (setf (restclient-request-headers request)
 	     (append (list '("Content-Type" . "application/json")
@@ -346,12 +346,12 @@ Content-Disposition: form-data; name="color"
 
 {{color}}
 --{{boundary}}
-Content-Disposition: form-data; name="first"; filename="input.json"
+Content-Disposition: form-data; name="evaluated-file"; filename="input.json"
 Content-Type: application/json; charset=utf-8
 
 <: ./with-vars.json
 --{{boundary}}
-Content-Disposition: form-data; name="second"; filename="input.xml"
+Content-Disposition: form-data; name="non-evaluated-file"; filename="input.xml"
 Content-Type: text/xml; charset=utf-8
 
 < sample.xml

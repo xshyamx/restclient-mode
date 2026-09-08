@@ -21,14 +21,13 @@
 (require 'url)
 (require 'json)
 (require 'outline)
-(require 'restclient-variables)
-(require 'restclient-edit)
 (eval-when-compile (require 'subr-x))
 (eval-when-compile
   (if (version< emacs-version "26")
       (require 'cl)
     (require 'cl-lib)))
 
+;;; Definitions of variables, constants & types
 (defgroup restclient nil
   "An interactive HTTP client for Emacs."
   :group 'tools)
@@ -153,17 +152,17 @@ other text)."
   "Face for HTTP header value."
   :group 'restclient-faces)
 
-(defface restclient-request-hook-face
+(defface restclient-hook-face
   '((t (:inherit font-lock-preprocessor-face)))
   "Face for single request hook indicator."
   :group 'restclient-faces)
 
-(defface restclient-request-hook-name-face
+(defface restclient-hook-name-face
   '((t (:inherit font-lock-function-name-face)))
   "Face for single request hook type names."
   :group 'restclient-faces)
 
-(defface restclient-request-hook-args-face
+(defface restclient-hook-args-face
   '((t (:inherit font-lock-string-face)))
   "Face for single request hook type arguments."
   :group 'restclient-faces)
@@ -260,7 +259,7 @@ hanging if two variables reference each other directly or indirectly."
 (defconst restclient-multi-line-begin "<<"
   "Marker for beginning of a multi-line variable value")
 
-(defconst restclient-multi-line-end (rx bol "#" eol)
+(defconst restclient-multi-line-end "^#$"
   "Marker for end of a multi-line variable value")
 
 (defconst restclient-comment-start-regexp
@@ -271,8 +270,13 @@ hanging if two variables reference each other directly or indirectly."
   (rx-to-string `(: bol (not ,restclient-comment-separator)) t)
   "Non-comment line start regexp")
 
-(defconst restclient-empty-line-regexp
-  (rx bol (* space) eol)
+(defconst restclient--space+ "[ \t]+"
+  "Regexp to match one or more spaces")
+
+(defconst restclient--space* "[ \t]*"
+  "Regexp to match zero or more spaces")
+
+(defconst restclient-empty-line-regexp (concat "^" restclient--space* "$")
   "Empty line regexp")
 
 (defconst restclient-http-methods
@@ -284,16 +288,10 @@ hanging if two variables reference each other directly or indirectly."
   "HTTP methods where body must not be sent")
 
 (defconst restclient-method-url-regexp
-  (rx-to-string `(: bol
-		    (group (or ,@restclient-http-methods))
-		    (+ space)
-		    (group (* any))
-		    eol)
-		t)
+  (concat "^" (regexp-opt restclient-http-methods t) restclient--space+ "\\(.*\\)$")
   "Regexp to match beginning of a request block")
 
-(defconst restclient-request-end-regexp
-  (rx bol (repeat 3 "#") eol)
+(defconst restclient-request-end-regexp "^###$"
   "Regexp to match the end of a request block")
 
 (defconst restclient-header-regexp
@@ -335,30 +333,47 @@ hanging if two variables reference each other directly or indirectly."
       eol)
   "Variable declaration regexp")
 
+(defconst restclient-var-name-regexp
+  "\\(?:[[:alpha:]]\\|[[:alpha:]_][[:alnum:]_-]*\\)"
+  "Regexp to match variable name. Must start with an alphabet or underscore
+followed by alphanumeric, underscore or hypen characters. underscore by
+itself cannot be used as a variable.")
+
 (defconst restclient-var-regexp
-  (concat "^\\(?:" restclient-var-prefix "\\([^:= ]+\\)\\)[ \t]*\\(:?\\)=[ \t]*\\(<<[ \t]*\n\\(\\(.*\n\\)*?\\)" restclient-comment-separator "\\|\\([^<].*\\)$\\)"))
+  (concat "^\\(?:" restclient-var-prefix "\\(" restclient-var-name-regexp "\\)\\)"
+	  restclient--space* "\\(:?\\)=" restclient--space*
+	  "\\(<<" restclient--space* "\n\\(\\(.*\n\\)*?\\)"
+	  restclient-comment-separator "\\|\\([^<].*\\)$\\)")
+  "Regexp to match a variable declaration")
 
 (defconst restclient-svar-regexp
-  (concat "^\\(" restclient-var-prefix "[^:= ]+\\)[ \t]*=[ \t]*\\(.+?\\)$")
+  (concat "^\\(" restclient-var-prefix restclient-var-name-regexp "\\)"
+	  restclient--space* "=" restclient--space* "\\(.+?\\)$")
   "String variable")
 
 (defconst restclient-evar-regexp
-  (concat "^\\(" restclient-var-prefix "[^: ]+\\)[ \t]*:=[ \t]*\\(.+?\\)$")
+  (concat "^\\(" restclient-var-prefix restclient-var-name-regexp"\\)"
+	  restclient--space* ":=" restclient--space* "\\(.+?\\)$")
   "Elisp variable")
 
 (defconst restclient-mvar-regexp
-  (concat "^\\(" restclient-var-prefix "[^: ]+\\)[ \t]*:?=[ \t]*\\(<<\\)[ \t]*$")
+  (concat "^\\(" restclient-var-prefix restclient-var-name-regexp "\\)"
+	  restclient--space* ":=" restclient--space*
+	  "\\(<<\\)" restclient--space* "$")
   "Multi-line variable")
 
 (defconst restclient-file-regexp
-  (rx bol "<" (group (? ":")) (+ space) (group (+ not-newline)) (* space) eol)
-  "Regexp to match payloads from file")
+  "^<\\(:?\\)" restclient--space+ "\\(.*\\)$"
+  "Regexp to match file payloads. Match string 1 is the filename")
 
 (defconst restclient-content-type-regexp
-  "^Content-[Tt]ype: \\(\\w+\\)/\\(?:[^\\+\r\n]*\\+\\)*\\([^;\r\n]+\\)")
+  (concat "^[Cc]ontent-[Tt]ype:" restclient--space+
+	  "\\(\\w+\\)/\\(?:[^\\+\r\n]*\\+\\)*\\([^;\r\n]+\\)"))
 
-(defconst restclient-response-hook-regexp
-  "^\\(->\\) \\([^[:space:]]+\\) +\\(.*\\)$")
+(defconst restclient-hook-regexp
+  (concat "^\\(->\\)" restclient--space+ "\\(pre-request\\|on-response\\)"
+	  restclient--space+ "\\((.*\\)$")
+  "Regexp to match request hooks")
 
 (defconst restclient-base-uri-var
   "base-uri"
@@ -395,6 +410,11 @@ hanging if two variables reference each other directly or indirectly."
 (cl-defstruct restclient-request
   "HTTP Request to be passed to the `pre-request' hooks"
   method url headers entity)
+
+
+;;; General functions
+(require 'restclient-variables)
+(require 'restclient-edit)
 
 (defun restclient-parse-multipart-entity (part)
   "Parse multipart fragment into headers & entity value"
@@ -701,12 +721,61 @@ Content-Type header. If no charset is specified, default to UTF-8."
       (when (and begin end)
 	(list begin end)))))
 
-(defun restclient-current-min ()
+(defconst restclient-request-boundary
+  (concat "^\\(?:"
+	  ;; request begin
+	  (regexp-opt restclient-http-methods t) restclient--space+ "\\(.*\\)"
+	  "\\|"
+	  "###"
+	  "\\)$")
+  "Regexp to match a request boundary")
+
+(defun restclient--request-boundary (&optional back)
+  "Returns if the nearest request boundary following point is a
+`request-begin'or `request-end'. The BACK argument reverses the search
+to look above the point"
   (save-excursion
     (beginning-of-line)
-    (if (looking-at restclient-method-url-regexp t)
-	(point)
-      (re-search-backward restclient-method-url-regexp nil t))))
+    (when (apply (if back #'re-search-backward #'re-search-forward)
+		 (list restclient-request-boundary nil t))
+      (if (string= "###" (match-string-no-properties 0))
+	  'request-end 'request-begin))))
+
+(defun restclient-inside-request-body-p ()
+  "Returns true if within a request body by checking the nearest boundary
+above is a `request-begin' and below is a `request-end'"
+  (save-excursion
+    (beginning-of-line)
+    (let ((previous (restclient--request-boundary t))
+	  (next (restclient--request-boundary)))
+      (and (eq 'request-begin previous)
+	   (eq 'request-end next)))))
+
+(defun restclient-current-min ()
+  "Returns the nearest request beginning. If point is inside request body
+that request will be picked otherwise whichever is the nearest request
+to point (nearest defined as the least number of lines from the current
+line)"
+  (let ((p (point)))
+    (save-excursion
+      (beginning-of-line)
+      (if (restclient-inside-request-body-p)
+	  (re-search-backward restclient-method-url-regexp nil t)
+	(let ((above (progn (goto-char p)
+			    (re-search-backward restclient-method-url-regexp nil t)))
+	      (below (progn (goto-char p)
+			    (re-search-forward restclient-method-url-regexp nil t)))
+	      (la) (lb) (lp))
+
+	  (cond
+	   ((and (numberp above) (numberp below))
+	    (setq
+	     lp (line-number-at-pos p)
+	     la (line-number-at-pos above)
+	     lb (line-number-at-pos below))
+	    (if (< (- lp la) (- lb lp)) above below))
+	   ((numberp above) above)
+	   ((numberp below) below)))))))
 
 (defun restclient-current-max ()
   (save-excursion
@@ -840,7 +909,7 @@ variable references using VARS in the result"
 	    (restclient-pre-request-functions nil))
         (forward-line)
         (while (cond
-		((looking-at restclient-response-hook-regexp)
+		((looking-at restclient-hook-regexp)
 		 (when-let (hook-function
 			    (restclient-parse-hook
 			     (match-string-no-properties 2)
@@ -1069,10 +1138,12 @@ eg. -> header-set-var csrfToken X-CSRF-Token")
 Optional argument RAW don't reformat response if t.
 Optional argument STAY-IN-WINDOW do not move focus to response buffer if t."
   (interactive)
-  (restclient-http-parse-current-and-do 'restclient-http-do raw stay-in-window suppress-response-buffer))
+  (restclient-http-parse-current-and-do
+   'restclient-http-do raw stay-in-window suppress-response-buffer))
 
 (defun restclient-http-send-current-raw ()
-  "Sends current request and get raw result (no reformatting or syntax highlight of XML, JSON or images)."
+  "Sends current request and get raw result (no reformatting or syntax
+highlight of XML, JSON or images)."
   (interactive)
   (restclient-http-send-current t))
 
@@ -1392,18 +1463,78 @@ jumps backwards"
   (unless (restclient-toggle-body-visibility)
     (indent-for-tab-command)))
 
+(defun restclient-file-payload-p ()
+  "Returns true if the point is in a line which is a file payload from a
+filepath"
+  (save-match-data
+    (save-excursion
+      (goto-char (line-beginning-position))
+      (when (re-search-forward
+	     (rx bol "<" (? ":") (+ space) (group (+ nonl)) eol) (line-end-position) t)
+	(match-string-no-properties 1)))))
+
+(defun restclient-edit-special ()
+  "Edit special blocks like
+
+1. elisp variables
+2. multi-line elisp variables
+3. file payloads"
+  (interactive)
+  (let ((type))
+    (save-match-data
+      (save-excursion
+	(beginning-of-line)
+	(setq type (cond
+		    ((looking-at restclient-file-regexp) 'file-payload)
+		    ((looking-at restclient-evar-regexp) 'elisp-variable)
+		    ((looking-at restclient-hook-regexp) 'hook)))))
+    (cond
+     ((eq type 'file-payload) (restclient-open-file-payload))
+     ((memq type '(elisp-variable hook)) (restclient-edit-indirect)))))
+
+(defun restclient-open-file-payload ()
+  "Open the file payload file resolving any variables to get the
+filepath. Even if the file does not exist will open after confirmation"
+  (interactive)
+  (let ((filepath (restclient-file-payload-p))
+	(vars (restclient-find-vars-in-region (point-min) (point))))
+    (if filepath
+	(let ((resolved (restclient-resolve-string filepath vars)))
+	  (if (null (string-match restclient-var-use-regexp resolved))
+	      (if (or (file-exists-p resolved)
+		      (yes-or-no-p (format "%s not found. Open anyway?" resolved)))
+		  (find-file resolved))
+	    (error "Failed to resolve all variables in filepath : %s" resolved))))))
+
+
+;;; Font lock keywords
 (defconst restclient-mode-keywords
-  (list (list restclient-method-url-regexp '(1 'restclient-method-face) '(2 'restclient-url-face))
-        (list restclient-svar-regexp '(1 'restclient-variable-name-face) '(2 'restclient-variable-string-face))
-        (list restclient-evar-regexp '(1 'restclient-variable-name-face) '(2 'restclient-variable-elisp-face t))
-        (list restclient-mvar-regexp '(1 'restclient-variable-name-face) '(2 'restclient-variable-multiline-face t))
-        (list restclient-header-var-regexp '(1 'restclient-variable-usage-face))
-        (list (rx "{{" (+ (not "}")) "}}") '(0 'restclient-variable-usage-face))
-        (list restclient-file-regexp '(0 'restclient-file-upload-face))
-        (list restclient-header-regexp '(1 'restclient-header-name-face t) '(2 'restclient-header-value-face t))
-	(list restclient-response-hook-regexp '(1 ' restclient-request-hook-face t)
-	      '(2 'restclient-request-hook-name-face t)
-	      '(3 'restclient-request-hook-args-face t))))
+  (list (list restclient-method-url-regexp
+	      '(1 'restclient-method-face)
+	      '(2 'restclient-url-face))
+        (list restclient-svar-regexp
+	      '(1 'restclient-variable-name-face)
+	      '(2 'restclient-variable-string-face))
+        (list restclient-evar-regexp
+	      '(1 'restclient-variable-name-face)
+	      '(2 'restclient-variable-elisp-face t))
+        (list restclient-mvar-regexp
+	      '(1 'restclient-variable-name-face)
+	      '(2 'restclient-variable-multiline-face t))
+        (list restclient-header-var-regexp
+	      '(1 'restclient-variable-usage-face))
+        (list (rx "{{" (+ (not "}")) "}}")
+	      '(0 'restclient-variable-usage-face))
+        (list restclient-file-regexp
+	      '(0 'restclient-file-upload-face))
+        (list restclient-header-regexp
+	      '(1 'restclient-header-name-face t)
+	      '(2 'restclient-header-value-face t))
+	(list restclient-hook-regexp '(1 ' restclient-hook-face t)
+	      '(2 'restclient-hook-name-face t)
+	      '(3 'restclient-hook-args-face t))
+	'("^\\(#\\|###\\)$" 1 'restclient-method-face prepend))
+  "Restclient font-lock keywords")
 
 (defconst restclient-mode-syntax-table
   (let ((table (make-syntax-table)))
@@ -1411,6 +1542,8 @@ jumps backwards"
     (modify-syntax-entry ?\n ">#" table)
     table))
 
+
+;;; Keymaps
 (defvar restclient-env-mode-map
   (let ((map (make-sparse-keymap)))
     (keymap-set map "r" #'restclient-reload-current-env)
@@ -1436,11 +1569,14 @@ jumps backwards"
     (keymap-set map "C-c n n" #'restclient-narrow-to-current)
     (keymap-set map "C-c C-i" #'restclient-show-info)
     (keymap-set map "C-c i" #'restclient-insert-request)
-    (keymap-set map "C-c '" #'restclient-edit-indirect)
+    (keymap-set map "C-c '" #'restclient-edit-special)
     (keymap-set map "C-c e" restclient-env-mode-map)
     map)
   "Keymap for restclient-mode.")
 
+
+
+;;; Minor modes
 (define-minor-mode restclient-outline-mode
   "Minor mode to allow show/hide of request bodies by TAB."
   :init-value nil
@@ -1463,6 +1599,8 @@ jumps backwards"
   "Menu for restclient-mode"
   restclient-menu-contents)
 
+
+;;; Major mode
 ;;;###autoload
 (define-derived-mode restclient-mode fundamental-mode
   restclient-default-mode-name
@@ -1484,11 +1622,15 @@ jumps backwards"
   ;; buffer-invisibility-spec
   (add-to-invisibility-spec '(outline . t)))
 
+
+;;; Hooks
 (add-hook 'restclient-mode-hook 'restclient-outline-mode)
 (add-hook 'hack-local-variables-hook #'restclient--load-env)
 
 (provide 'restclient-mode)
+
 
+;;; Modes specific tweaks tweaks
 (eval-after-load 'helm
   '(ignore-errors (require 'restclient-helm)))
 

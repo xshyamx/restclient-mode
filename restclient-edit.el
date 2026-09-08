@@ -8,6 +8,20 @@
 
 ;;; Code:
 
+
+(defconst restclient-elisp-var-or-hook-regexp
+  (concat "^\\(?:"
+	  ;; hook
+	  "->" restclient--space+ (regexp-opt '("pre-request" "on-response") t)
+	  restclient--space+ "\\(.*\\)"
+	  "\\|"
+	  ;; elisp variable declaration
+	  restclient-var-prefix "\\(" restclient-var-name-regexp "\\)"
+	  restclient--space* restclient-elisp-var-assigment restclient--space*
+	  "\\(" restclient-multi-line-begin "\\|.*\\)"
+	  "\\)$")
+  "Regexp to match elisp variable or hook")
+
 (defun restclient-src-commit ()
   "Update the s-expression associated with a hook in the originating
 restclient buffer"
@@ -40,25 +54,11 @@ and save back to the restclient buffer"
   (interactive)
   (let ((begin) (end) (exp) (sexp) (buffer) (mbegin)
 	(p (point))
-	(src-buf (current-buffer))
-	(regexp (rx bol
-		    (or (seq "->" (+ space)
-			     (group (or "pre-request" "on-response"))
-			     (+ space)
-			     (group "(" (* any)))
-			(seq "@" (group (or alpha "_")
-					(*? (or alnum "-" "_")))
-			     (* space)
-			     ;; assignment
-			     ":="
-			     (* space)
-			     ;; multi-line
-			     (group (or "<<" (* not-newline)))))
-		    eol)))
+	(src-buf (current-buffer)))
     (save-excursion
-      (goto-char (line-beginning-position))
-      (when (or (looking-at regexp)
-		(re-search-backward regexp nil nil))
+      (beginning-of-line)
+      (when (or (looking-at restclient-elisp-var-or-hook-regexp)
+		(re-search-backward restclient-elisp-var-or-hook-regexp nil nil))
 	(setq mbegin (match-beginning 0)
 	      begin (or (match-beginning 2)
 			(match-beginning 4))

@@ -363,7 +363,7 @@ itself cannot be used as a variable.")
   "Multi-line variable")
 
 (defconst restclient-file-regexp
-  "^<\\(:?\\)" restclient--space+ "\\(.*\\)$"
+  (concat "^<\\(:?\\)" restclient--space+ "\\(.*\\)$")
   "Regexp to match file payloads. Match string 1 is the filename")
 
 (defconst restclient-content-type-regexp

@@ -261,7 +261,7 @@ Cookie: {{cookie}}
 # multi-line elisp expression called on completion
 GET /response-headers?Content-Type=application/vnd.whatever%2Bjson;%20charset=UTF-8
 -> on-response (message "dynamic hook called %s %s"
-                  (random ) (random ))
+         (random) (random))
 ###
 
 # set a variable to the value of your ip address using a jq expression

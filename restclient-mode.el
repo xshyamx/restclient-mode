@@ -759,23 +759,25 @@ line)"
   (let ((p (point)))
     (save-excursion
       (beginning-of-line)
-      (if (restclient-inside-request-body-p)
-	  (re-search-backward restclient-method-url-regexp nil t)
-	(let ((above (progn (goto-char p)
-			    (re-search-backward restclient-method-url-regexp nil t)))
-	      (below (progn (goto-char p)
-			    (re-search-forward restclient-method-url-regexp nil t)))
-	      (la) (lb) (lp))
+      (cond
+       ((looking-at restclient-method-url-regexp) (point))
+       ((restclient-inside-request-body-p)
+	(re-search-backward restclient-method-url-regexp nil t))
+       (t (let ((above (progn (goto-char p)
+			      (re-search-backward restclient-method-url-regexp nil t)))
+		(below (progn (goto-char p)
+			      (re-search-forward restclient-method-url-regexp nil t)))
+		(la) (lb) (lp))
 
-	  (cond
-	   ((and (numberp above) (numberp below))
-	    (setq
-	     lp (line-number-at-pos p)
-	     la (line-number-at-pos above)
-	     lb (line-number-at-pos below))
-	    (if (< (- lp la) (- lb lp)) above below))
-	   ((numberp above) above)
-	   ((numberp below) below)))))))
+	    (cond
+	     ((and (numberp above) (numberp below))
+	      (setq
+	       lp (line-number-at-pos p)
+	       la (line-number-at-pos above)
+	       lb (line-number-at-pos below))
+	      (if (< (- lp la) (- lb lp)) above below))
+	     ((numberp above) above)
+	     ((numberp below) below))))))))
 
 (defun restclient-current-max ()
   (save-excursion
@@ -897,11 +899,9 @@ variable references using VARS in the result"
 
 (defun restclient-http-parse-current-and-do (func &rest args)
   (goto-char
-   (if-let (begin (restclient-current-min))
-       begin
-     (restclient-jump-next)))
+   (restclient-current-min))
   (save-excursion
-    (when (re-search-forward restclient-method-url-regexp (restclient-current-max) t)
+    (when (looking-at restclient-method-url-regexp)
       (let ((method (match-string-no-properties 1))
             (url (string-trim (match-string-no-properties 2)))
             (vars (restclient-find-vars-in-region (point-min) (point)))

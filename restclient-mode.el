@@ -766,7 +766,8 @@ line)"
        (t (let ((above (progn (goto-char p)
 			      (re-search-backward restclient-method-url-regexp nil t)))
 		(below (progn (goto-char p)
-			      (re-search-forward restclient-method-url-regexp nil t)))
+			      (re-search-forward restclient-method-url-regexp nil t)
+			      (match-beginning 0)))
 		(la) (lb) (lp))
 
 	    (cond
